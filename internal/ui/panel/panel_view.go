@@ -129,8 +129,12 @@ func (m Model) renderRow(idx, width int, th theme.Theme) string {
 	// Style based on state
 	var style lipgloss.Style
 	switch {
+	case isCursor && isDir && isSelected:
+		style = th.FileCursorDirSelected
 	case isCursor && isDir:
 		style = th.FileCursorDir
+	case isCursor && isSelected:
+		style = th.FileCursorSelected
 	case isCursor:
 		style = th.FileCursor
 	case isSelected:

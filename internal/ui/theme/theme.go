@@ -11,13 +11,15 @@ type Theme struct {
 	PanelHeaderActive lipgloss.Style
 
 	// File list
-	FileNormal    lipgloss.Style
-	FileDir       lipgloss.Style
-	FileExec      lipgloss.Style
-	FileSymlink   lipgloss.Style
-	FileCursor    lipgloss.Style
-	FileCursorDir lipgloss.Style
-	FileSelected  lipgloss.Style
+	FileNormal            lipgloss.Style
+	FileDir               lipgloss.Style
+	FileExec              lipgloss.Style
+	FileSymlink           lipgloss.Style
+	FileCursor            lipgloss.Style
+	FileCursorDir         lipgloss.Style
+	FileSelected          lipgloss.Style
+	FileCursorSelected    lipgloss.Style
+	FileCursorDirSelected lipgloss.Style
 
 	// Status bar and menu bar
 	StatusBar lipgloss.Style
