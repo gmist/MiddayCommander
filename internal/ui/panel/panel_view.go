@@ -44,8 +44,10 @@ func (m Model) View(th theme.Theme) string {
 		headerStyle.Render(" "+truncOrPad(header, innerWidth-2)+" ") +
 		borderStyle.Render("┐")
 
-	// File list rows
-	var rows []string
+	// File list rows. The vertical bar is styled once and reused: it is the
+	// hottest allocation in the render path, twice per row per frame.
+	vbar := borderStyle.Render("│")
+	rows := make([]string, 0, m.height)
 	end := m.offset + m.height
 	if end > len(m.entries) {
 		end = len(m.entries)
@@ -53,13 +55,13 @@ func (m Model) View(th theme.Theme) string {
 
 	for i := m.offset; i < end; i++ {
 		row := m.renderRow(i, innerWidth, th)
-		rows = append(rows, borderStyle.Render("│")+row+borderStyle.Render("│"))
+		rows = append(rows, vbar+row+vbar)
 	}
 
 	// Fill remaining rows with empty space
 	emptyRow := th.FileNormal.Render(strings.Repeat(" ", innerWidth))
 	for len(rows) < m.height {
-		rows = append(rows, borderStyle.Render("│")+emptyRow+borderStyle.Render("│"))
+		rows = append(rows, vbar+emptyRow+vbar)
 	}
 
 	// Footer

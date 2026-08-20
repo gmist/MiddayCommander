@@ -53,7 +53,12 @@ func main() {
 
 	opts := []tea.ProgramOption{
 		tea.WithAltScreen(),
-		tea.WithMouseAllMotion(),
+		// Cell motion, not all motion: only clicks, wheel and drags are used,
+		// so bare pointer movement must not cost a full re-render per cell.
+		tea.WithMouseCellMotion(),
+		// The UI has no animation beyond a 100ms spinner; 30fps halves the
+		// renderer's idle wakeups, which matters on low-power hardware.
+		tea.WithFPS(30),
 		tea.WithFilter(app.KittyFilter),
 	}
 	if ttyFile != nil {
@@ -63,9 +68,12 @@ func main() {
 	p := tea.NewProgram(app.New(version), opts...)
 
 	// Poll OS-level shift key state and send messages to the Bubble Tea program.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go pollShift(ctx, p)
+	// Skipped where IsShiftPressed is a stub, so the ticker never runs for nothing.
+	if platform.ShiftPollingSupported {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go pollShift(ctx, p)
+	}
 
 	final, err := p.Run()
 	if err != nil {
