@@ -55,6 +55,14 @@ func Default() Theme {
 			Foreground(colorYellow).
 			Background(colorBlue).
 			Bold(true),
+		FileCursorSelected: lipgloss.NewStyle().
+			Foreground(colorYellow).
+			Background(colorCyan).
+			Bold(true),
+		FileCursorDirSelected: lipgloss.NewStyle().
+			Foreground(colorYellow).
+			Background(colorCyan).
+			Bold(true),
 
 		StatusBar: lipgloss.NewStyle().
 			Foreground(colorBlack).
