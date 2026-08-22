@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/config"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
@@ -170,8 +171,9 @@ func View(th theme.Theme, width int, items []Item) string {
 }
 
 func padOrTrunc(s string, width int) string {
-	if len(s) > width {
-		return s[:width]
+	w := ansi.StringWidth(s)
+	if w > width {
+		return ansi.Truncate(s, width, "")
 	}
-	return s + strings.Repeat(" ", width-len(s))
+	return s + strings.Repeat(" ", width-w)
 }

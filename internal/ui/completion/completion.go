@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 var (
@@ -52,9 +53,9 @@ func CommonPrefix(strs []string) string {
 func PadOrTrim(s string, width int) string {
 	if lipgloss.Width(s) > width {
 		if width > 3 {
-			return s[:width-3] + "..."
+			return ansi.Truncate(s, width-3, "") + "..."
 		}
-		return s[:width]
+		return ansi.Truncate(s, width, "")
 	}
 	return s + strings.Repeat(" ", width-lipgloss.Width(s))
 }

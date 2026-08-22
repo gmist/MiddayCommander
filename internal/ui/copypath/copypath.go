@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/platform"
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
@@ -154,8 +155,8 @@ func (m Model) View(_ theme.Theme, screenWidth, screenHeight int) string {
 			prefix = "> "
 		}
 		display := p
-		if len(display) > innerW-len(prefix) {
-			display = "…" + display[len(display)-(innerW-len(prefix))+1:]
+		if ansi.StringWidth(display) > innerW-len(prefix) {
+			display = overlay.TruncateLeftEllipsis(display, innerW-len(prefix))
 		}
 		line := padStr(prefix+display, innerW)
 		if i == m.cursor {

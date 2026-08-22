@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/platform"
 	"github.com/kooler/MiddayCommander/internal/ui/completion"
@@ -529,41 +530,33 @@ func formatBytes(n int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGTPE"[exp])
 }
 
-// truncateLeft keeps the right-most characters, prefixing with … if clipped.
-// Useful for long file paths where the trailing name matters more.
+// truncateLeft keeps the right-most cells, prefixing with an ellipsis if clipped.
 func truncateLeft(s string, width int) string {
-	if width < 1 {
-		return ""
-	}
-	if len(s) <= width {
-		return s
-	}
-	if width == 1 {
-		return "…"
-	}
-	return "…" + s[len(s)-width+1:]
+	return overlay.TruncateLeftEllipsis(s, width)
 }
 
 func padRight(s string, width int) string {
-	if len(s) >= width {
-		return s[:width]
+	w := ansi.StringWidth(s)
+	if w >= width {
+		return ansi.Truncate(s, width, "")
 	}
-	return s + strings.Repeat(" ", width-len(s))
+	return s + strings.Repeat(" ", width-w)
 }
 
 func wrapText(text string, width int) []string {
-	if len(text) <= width {
+	if ansi.StringWidth(text) <= width {
 		return []string{text}
 	}
 	var lines []string
-	for len(text) > width {
+	for ansi.StringWidth(text) > width {
 		// Find last space before width
-		cut := width
-		for cut > 0 && text[cut] != ' ' {
+		head := ansi.Truncate(text, width, "")
+		cut := len(head)
+		for cut > 0 && text[cut-1] != ' ' {
 			cut--
 		}
 		if cut == 0 {
-			cut = width
+			cut = len(head)
 		}
 		lines = append(lines, text[:cut])
 		text = strings.TrimLeft(text[cut:], " ")

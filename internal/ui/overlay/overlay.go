@@ -101,3 +101,31 @@ func RenderBox(title string, contentLines []string, footer string, width, height
 
 	return strings.Join(lines, "\n")
 }
+
+// TruncateLeftEllipsis keeps the right-most cells of s, prefixing with an
+// ellipsis if clipped. It never returns wider than width cells.
+func TruncateLeftEllipsis(s string, width int) string {
+	const ellipsis = "…" // U+2026 horizontal ellipsis - one cell wide
+	if width < 1 {
+		return ""
+	}
+	w := ansi.StringWidth(s)
+	if w <= width {
+		return s
+	}
+	if width == 1 {
+		return ellipsis
+	}
+
+	n := w - (width - 1)
+	tail := ansi.TruncateLeft(s, n, "")
+	// If the cut inside a wide character (CJK, emoji) TruncateLeft keeps
+	// the whole character and pads with a space. So the tail can come
+	// out one cell wider than the budget. Shifting the cut one cell at
+	// a time guarantees the final width
+	for ansi.StringWidth(tail) > width-1 {
+		n++
+		tail = ansi.TruncateLeft(s, n, "")
+	}
+	return ellipsis + tail
+}

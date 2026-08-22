@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kooler/MiddayCommander/internal/ui/overlay"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
 
@@ -37,8 +39,8 @@ func (m Model) View(th theme.Theme) string {
 			header = archName + "://" + m.path
 		}
 	}
-	if len(header) > innerWidth-4 {
-		header = "..." + header[len(header)-innerWidth+7:]
+	if ansi.StringWidth(header) > innerWidth-4 {
+		header = overlay.TruncateLeftEllipsis(header, innerWidth-4)
 	}
 	headerLine := borderStyle.Render("┌") +
 		headerStyle.Render(" "+truncOrPad(header, innerWidth-2)+" ") +
@@ -155,20 +157,22 @@ func (m Model) renderRow(idx, width int, th theme.Theme) string {
 }
 
 func truncOrPad(s string, width int) string {
-	if len(s) > width {
+	w := ansi.StringWidth(s)
+	if w > width {
 		if width > 3 {
-			return s[:width-3] + "..."
+			return ansi.Truncate(s, width-3, "") + "..."
 		}
-		return s[:width]
+		return ansi.Truncate(s, width, "")
 	}
-	return s + strings.Repeat(" ", width-len(s))
+	return s + strings.Repeat(" ", width-w)
 }
 
 func padLeft(s string, width int) string {
-	if len(s) >= width {
-		return s[:width]
+	w := ansi.StringWidth(s)
+	if w >= width {
+		return ansi.Truncate(s, width, "")
 	}
-	return strings.Repeat(" ", width-len(s)) + s
+	return strings.Repeat(" ", width-w) + s
 }
 
 func isExecutable(mode fs.FileMode) bool {

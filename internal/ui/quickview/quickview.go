@@ -14,6 +14,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
@@ -245,7 +246,7 @@ func (m Model) centered(width int, msgs ...string) []string {
 		lines = append(lines, "")
 	}
 	for _, s := range msgs {
-		if pad := (width - len([]rune(s))) / 2; pad > 0 {
+		if pad := (width - ansi.StringWidth(s)) / 2; pad > 0 {
 			s = strings.Repeat(" ", pad) + s
 		}
 		lines = append(lines, s)
@@ -308,14 +309,14 @@ func truncOrPad(s string, width int) string {
 	if width < 0 {
 		width = 0
 	}
-	r := []rune(s)
-	if len(r) > width {
+	w := ansi.StringWidth(s)
+	if w > width {
 		if width > 3 {
-			return string(r[:width-3]) + "..."
+			return ansi.Truncate(s, width-3, "") + "..."
 		}
-		return string(r[:width])
+		return ansi.Truncate(s, width, "")
 	}
-	return s + strings.Repeat(" ", width-len(r))
+	return s + strings.Repeat(" ", width-w)
 }
 
 func formatSize(n int64) string {

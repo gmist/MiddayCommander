@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/bookmark"
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
@@ -288,8 +289,8 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		if b.Name != "" {
 			display = b.Name + " → " + b.Path
 		}
-		if len(display) > innerW-4 {
-			display = "…" + display[len(display)-innerW+5:]
+		if ansi.StringWidth(display) > innerW-4 {
+			display = overlay.TruncateLeftEllipsis(display, innerW-4)
 		}
 
 		line := prefix + display
@@ -334,8 +335,9 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 }
 
 func padStr(s string, width int) string {
-	if len(s) >= width {
-		return s[:width]
+	w := ansi.StringWidth(s)
+	if w >= width {
+		return ansi.Truncate(s, width, "")
 	}
-	return s + strings.Repeat(" ", width-len(s))
+	return s + strings.Repeat(" ", width-w)
 }
