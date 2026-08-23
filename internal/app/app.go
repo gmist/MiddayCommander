@@ -1032,7 +1032,7 @@ func (m Model) startFuzzyFind() (tea.Model, tea.Cmd) {
 
 func (m Model) startView() (tea.Model, tea.Cmd) {
 	e := m.activePanel().CurrentEntry()
-	if e == nil || e.IsDir() {
+	if e == nil || e.IsDir() || m.activePanel().IsSymlinkToDir(e) {
 		return m, nil
 	}
 	if !m.activePanel().IsLocal() {
@@ -1047,7 +1047,7 @@ func (m Model) startView() (tea.Model, tea.Cmd) {
 
 func (m Model) startEdit() (tea.Model, tea.Cmd) {
 	e := m.activePanel().CurrentEntry()
-	if e == nil || e.IsDir() {
+	if e == nil || e.IsDir() || m.activePanel().IsSymlinkToDir(e) {
 		return m, nil
 	}
 	if !m.activePanel().IsLocal() {
@@ -1297,7 +1297,7 @@ func (m *Model) syncQuickView() tea.Cmd {
 		return nil
 	}
 	entry := p.CurrentEntry()
-	isDir := entry != nil && entry.IsDir()
+	isDir := entry != nil && (entry.IsDir() || p.IsSymlinkToDir(entry))
 	// Archive entries have no readable stream; local and remote both do.
 	available := p.Location().Kind != vfs.KindArchive
 	// A remote file comes back as a quickview.FileLoadedMsg.

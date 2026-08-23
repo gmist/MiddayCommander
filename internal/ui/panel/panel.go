@@ -155,6 +155,15 @@ func (m Model) InArchive() bool {
 	return m.Location().Kind == vfs.KindArchive
 }
 
+// IsSymlinkToDir returns whether e is a symlink that resolves to a directory.
+func (m Model) IsSymlinkToDir(e fs.DirEntry) bool {
+	if m.InArchive() || e.Type()&fs.ModeSymlink == 0 {
+		return false
+	}
+	info, err := m.Location().FS.Stat(m.CurrentPath())
+	return err == nil && info.IsDir()
+}
+
 // LocationLabel is the display string for a nested location, or "".
 func (m Model) LocationLabel() string {
 	return m.Location().Label
@@ -442,7 +451,7 @@ func (m *Model) handleEnter() tea.Cmd {
 	if e == nil {
 		return nil
 	}
-	if e.IsDir() {
+	if e.IsDir() || m.IsSymlinkToDir(e) {
 		return m.enterDir()
 	}
 
@@ -496,7 +505,7 @@ func (m *Model) enterDir() tea.Cmd {
 	if e == nil {
 		return nil
 	}
-	if !e.IsDir() {
+	if !e.IsDir() && !m.IsSymlinkToDir(e) {
 		return nil
 	}
 	if e.Name() == ".." {
