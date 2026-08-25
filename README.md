@@ -1,12 +1,11 @@
 # Midday Commander
 
 <img alt="Static Badge" src="https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square&link=https%3A%2F%2Fcloudsmith.com"></img>
+[![DemoShell — live demo](https://build.demoshell.com/v1/embed/badge.svg)](https://build.demoshell.com/launch?snapshot=kooler%2Ftui%3Amdc)
 
 A modern dual-panel terminal file manager written in Go, inspired by Midnight Commander.
 
 Midday Commander (mdc) brings the classic dual-panel file management paradigm into the modern terminal with fuzzy finding, bookmarks, archive browsing, themes and customizable keybindings.
-
-[![Live demo — powered by DemoShell](https://build.demoshell.com/v1/embed/thumbnail?snapshot=kooler%2Ftui%3Amdc)](https://build.demoshell.com/launch?snapshot=kooler%2Ftui%3Amdc)
 
 ![Midday Commander](images/sc_general.png)
 
