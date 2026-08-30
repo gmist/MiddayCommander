@@ -13,6 +13,7 @@ import (
 	"github.com/kooler/MiddayCommander/internal/ui/completion"
 
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
+	uitext "github.com/kooler/MiddayCommander/internal/ui/text"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
 
@@ -203,25 +204,25 @@ func (m *Model) updateInput(msg tea.KeyMsg) tea.Cmd {
 			})
 		}
 	case "backspace":
-		start := prevCluster(m.input, m.inputPos)
+		start := uitext.PreviousGraphemeBoundary(m.input, m.inputPos)
 		if start >= 0 {
 			m.input = m.input[:start] + m.input[m.inputPos:]
 			m.inputPos = start
 		}
 		m.updateSuggestions()
 	case "delete":
-		end := nextCluster(m.input, m.inputPos)
+		end := uitext.NextGraphemeBoundary(m.input, m.inputPos)
 		if end > m.inputPos {
 			m.input = m.input[:m.inputPos] + m.input[end:]
 		}
 		m.updateSuggestions()
 	case "left":
-		start := prevCluster(m.input, m.inputPos)
+		start := uitext.PreviousGraphemeBoundary(m.input, m.inputPos)
 		if start >= 0 {
 			m.inputPos = start
 		}
 	case "right":
-		end := nextCluster(m.input, m.inputPos)
+		end := uitext.NextGraphemeBoundary(m.input, m.inputPos)
 		if end > m.inputPos {
 			m.inputPos = end
 		}
@@ -254,38 +255,6 @@ func (m *Model) updateInput(msg tea.KeyMsg) tea.Cmd {
 		}
 	}
 	return nil
-}
-
-// prevCluster returns the byte index of the grapheme cluster boundary
-// before pos, or -1 if pos is already at the start
-func prevCluster(s string, pos int) int {
-	if pos <= 0 {
-		return -1
-	}
-	if pos > len(s) {
-		pos = len(s)
-	}
-	prev, b := 0, 0
-	for b < pos {
-		c, _ := ansi.FirstGraphemeCluster(s[b:], ansi.GraphemeWidth)
-		next := b + len(c)
-		if next >= pos {
-			break
-		}
-		prev = next
-		b = next
-	}
-	return prev
-}
-
-// nextCluster returns the byte index after the grapheme cluster at pos, or
-// pos when already at the end
-func nextCluster(s string, pos int) int {
-	if pos >= len(s) {
-		return pos
-	}
-	c, _ := ansi.FirstGraphemeCluster(s[pos:], ansi.GraphemeWidth)
-	return pos + len(c)
 }
 
 func (m *Model) updateSuggestions() {
