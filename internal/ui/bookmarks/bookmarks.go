@@ -10,6 +10,7 @@ import (
 
 	"github.com/kooler/MiddayCommander/internal/bookmark"
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
+	uitext "github.com/kooler/MiddayCommander/internal/ui/text"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
 
@@ -23,17 +24,17 @@ type DismissMsg struct{}
 
 // Model is the bookmark list overlay.
 type Model struct {
-	store   *bookmark.Store
-	items   []bookmark.Bookmark
-	cursor  int
-	offset  int
-	width   int
-	height  int
+	store     *bookmark.Store
+	items     []bookmark.Bookmark
+	cursor    int
+	offset    int
+	width     int
+	height    int
 	filter    string // search/filter query
 	filtering bool   // true when filter input is active
 	adding    bool   // true when prompting for bookmark name
-	addPath string // path being bookmarked
-	addName string // name being typed
+	addPath   string // path being bookmarked
+	addName   string // name being typed
 }
 
 // New creates a new bookmark list overlay.
@@ -71,8 +72,8 @@ func (m Model) Update(msg tea.KeyMsg) (Model, tea.Cmd) {
 			}
 			m.filtering = false
 		case "backspace":
-			if len(m.filter) > 0 {
-				m.filter = m.filter[:len(m.filter)-1]
+			if start := uitext.PreviousGraphemeBoundary(m.filter, len(m.filter)); start >= 0 {
+				m.filter = m.filter[:start]
 				m.refilter()
 			} else {
 				m.filtering = false
@@ -88,8 +89,7 @@ func (m Model) Update(msg tea.KeyMsg) (Model, tea.Cmd) {
 				m.clampOffset()
 			}
 		default:
-			s := msg.String()
-			if len(s) == 1 && s[0] >= 32 {
+			if s, ok := printableInput(msg); ok {
 				m.filter += s
 				m.refilter()
 			}
@@ -154,17 +154,35 @@ func (m Model) updateAdding(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.adding = false
 		return m, nil
 	case "backspace":
-		if len(m.addName) > 0 {
-			m.addName = m.addName[:len(m.addName)-1]
+		if start := uitext.PreviousGraphemeBoundary(m.addName, len(m.addName)); start >= 0 {
+			m.addName = m.addName[:start]
 		}
 		return m, nil
 	default:
-		s := msg.String()
-		if len(s) == 1 && s[0] >= 32 {
+		if s, ok := printableInput(msg); ok {
 			m.addName += s
 		}
 		return m, nil
 	}
+}
+
+func printableInput(msg tea.KeyMsg) (string, bool) {
+	if msg.Type != tea.KeyRunes && msg.Type != tea.KeySpace {
+		return "", false
+	}
+	s := string(msg.Runes)
+	if msg.Type == tea.KeySpace {
+		s = " "
+	}
+	if s == "" {
+		return "", false
+	}
+	for _, r := range s {
+		if r < 32 {
+			return "", false
+		}
+	}
+	return s, true
 }
 
 func (m *Model) refilter() {
