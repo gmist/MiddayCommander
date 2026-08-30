@@ -370,7 +370,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 	case KindInput:
 		// Message label and input with cursor at inputPos
 		label := " " + m.message + " "
-		labelW := lipgloss.Width(label)
+		labelW := ansi.StringWidth(label)
 		maxInput := innerW - labelW
 		if maxInput < 1 {
 			maxInput = 1
@@ -443,7 +443,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 			// Format suggestions compactly (multiple per line) like Ctrl+R
 			formatted := completion.FormatSuggestions(m.suggestions, innerW-2, 6, true)
 			for _, suggLine := range formatted {
-				sugLine := overlay.PadOrTruncEllipsis(suggLine, innerW-1)
+				sugLine := overlay.PadOrTruncDots(suggLine, innerW-1)
 				contentLines = append(contentLines, bgStyle.Render(" "+sugLine))
 			}
 		}

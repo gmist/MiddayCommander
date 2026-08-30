@@ -107,7 +107,7 @@ func RenderBox(title string, contentLines []string, footer string, width, height
 //
 // The U+2026 glyph is intentional: left-truncation of paths has used it
 // since the initial import, right-truncation keeps ASCII "..." (see
-// PadOrTruncEllipsis). Counted as one cell, matching the renderer
+// PadOrTruncDots). Counted as one cell, matching the renderer
 func TruncateLeftEllipsis(s string, width int) string {
 	const ellipsis = "…" // U+2026 horizontal ellipsis - one cell wide
 	if width < 1 {
@@ -149,9 +149,9 @@ func PadOrTrunc(s string, width int) string {
 	return s + strings.Repeat(" ", width-w)
 }
 
-// PadOrTruncEllipsis is PadOrTrunc, but clipped values end with "..." so the
+// PadOrTruncDots is PadOrTrunc, but clipped values end with "..." so the
 // cut stays visible. The result is exactly width cells when width >= 1
-func PadOrTruncEllipsis(s string, width int) string {
+func PadOrTruncDots(s string, width int) string {
 	if width < 1 {
 		return ""
 	}

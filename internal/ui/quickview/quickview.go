@@ -182,7 +182,7 @@ func (m Model) View(th theme.Theme, focused bool) string {
 	// Header: filename + preview tag.
 	header := m.name + " [preview]"
 	headerLine := borderStyle.Render("┌") +
-		headerStyle.Render(" "+overlay.PadOrTruncEllipsis(header, innerWidth-2)+" ") +
+		headerStyle.Render(" "+overlay.PadOrTruncDots(header, innerWidth-2)+" ") +
 		borderStyle.Render("┐")
 
 	// Body.
@@ -202,7 +202,7 @@ func (m Model) View(th theme.Theme, focused bool) string {
 
 	// Footer.
 	footerLine := borderStyle.Render("└") +
-		headerStyle.Render(overlay.PadOrTruncEllipsis(m.footerText(), innerWidth)) +
+		headerStyle.Render(overlay.PadOrTruncDots(m.footerText(), innerWidth)) +
 		borderStyle.Render("┘")
 
 	parts := []string{headerLine}
@@ -216,7 +216,7 @@ func (m Model) contentLines(width int, normal lipgloss.Style) []string {
 	render := func(ss []string) []string {
 		out := make([]string, len(ss))
 		for i, s := range ss {
-			out[i] = normal.Render(overlay.PadOrTruncEllipsis(s, width))
+			out[i] = normal.Render(overlay.PadOrTruncDots(s, width))
 		}
 		return out
 	}

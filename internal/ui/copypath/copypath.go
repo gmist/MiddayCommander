@@ -147,7 +147,7 @@ func (m Model) View(_ theme.Theme, screenWidth, screenHeight int) string {
 	dimStyle := lipgloss.NewStyle().Background(bg).Foreground(subtle)
 
 	var contentLines []string
-	contentLines = append(contentLines, dimStyle.Render(padStr(" "+helpText, innerW)))
+	contentLines = append(contentLines, dimStyle.Render(overlay.PadOrTrunc(" "+helpText, innerW)))
 	contentLines = append(contentLines, bgStyle.Render(strings.Repeat(" ", innerW)))
 
 	for i, p := range m.paths {
@@ -159,7 +159,7 @@ func (m Model) View(_ theme.Theme, screenWidth, screenHeight int) string {
 		if ansi.StringWidth(display) > innerW-len(prefix) {
 			display = overlay.TruncateLeftEllipsis(display, innerW-len(prefix))
 		}
-		line := padStr(prefix+display, innerW)
+		line := overlay.PadOrTrunc(prefix+display, innerW)
 		if i == m.cursor {
 			contentLines = append(contentLines, cursorStyle.Render(line))
 		} else {
@@ -180,11 +180,4 @@ func (m Model) View(_ theme.Theme, screenWidth, screenHeight int) string {
 
 	return overlay.RenderBox("Copy Path", contentLines, footer, boxW, boxH,
 		accent, bg, highlight)
-}
-
-func padStr(s string, width int) string {
-	if lipgloss.Width(s) >= width {
-		return s
-	}
-	return s + strings.Repeat(" ", width-lipgloss.Width(s))
 }

@@ -46,7 +46,7 @@ func (m Model) View(th theme.Theme) string {
 		header = overlay.TruncateLeftEllipsis(header, innerWidth-4)
 	}
 	headerLine := borderStyle.Render("┌") +
-		headerStyle.Render(" "+overlay.PadOrTruncEllipsis(header, innerWidth-2)+" ") +
+		headerStyle.Render(" "+overlay.PadOrTruncDots(header, innerWidth-2)+" ") +
 		borderStyle.Render("┐")
 
 	// File list rows. The vertical bar is styled once and reused: it is the
@@ -85,7 +85,7 @@ func (m Model) View(th theme.Theme) string {
 		}
 	}
 	footerLine := borderStyle.Render("└") +
-		headerStyle.Render(overlay.PadOrTruncEllipsis(footerText, innerWidth)) +
+		headerStyle.Render(overlay.PadOrTruncDots(footerText, innerWidth)) +
 		borderStyle.Render("┘")
 
 	// Assemble
@@ -135,11 +135,11 @@ func (m Model) renderRow(idx, width int, th theme.Theme) string {
 		return ""
 	}
 
-	line := overlay.PadOrTruncEllipsis(name, nameWidth)
+	line := overlay.PadOrTruncDots(name, nameWidth)
 	if sizeWidth > 0 {
 		line += " " + overlay.PadLeft(sizeStr, sizeWidth)
 		if timeWidth > 0 {
-			line += " " + overlay.PadOrTruncEllipsis(timeStr, timeWidth)
+			line += " " + overlay.PadOrTruncDots(timeStr, timeWidth)
 		}
 	}
 

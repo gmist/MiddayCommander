@@ -237,7 +237,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		display := entry.Name
 		maxNameW := innerW - 4 - ansi.StringWidth(tag) // 3-cell gutter + 1-col right margin
 		if ansi.StringWidth(display) > maxNameW {
-			display = overlay.PadOrTruncEllipsis(display, maxNameW)
+			display = overlay.PadOrTruncDots(display, maxNameW)
 		}
 
 		if isCursor {
