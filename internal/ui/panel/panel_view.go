@@ -157,20 +157,29 @@ func (m Model) renderRow(idx, width int, th theme.Theme) string {
 }
 
 func truncOrPad(s string, width int) string {
+	if width < 1 {
+		return ""
+	}
 	w := ansi.StringWidth(s)
 	if w > width {
 		if width > 3 {
-			return ansi.Truncate(s, width-3, "") + "..."
+			out := ansi.Truncate(s, width-3, "") + "..."
+			return out + strings.Repeat(" ", width-ansi.StringWidth(out))
 		}
-		return ansi.Truncate(s, width, "")
+		out := ansi.Truncate(s, width, "")
+		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
 	}
 	return s + strings.Repeat(" ", width-w)
 }
 
 func padLeft(s string, width int) string {
+	if width < 1 {
+		return ""
+	}
 	w := ansi.StringWidth(s)
 	if w >= width {
-		return ansi.Truncate(s, width, "")
+		out := ansi.Truncate(s, width, "")
+		return strings.Repeat(" ", width-ansi.StringWidth(out)) + out
 	}
 	return strings.Repeat(" ", width-w) + s
 }

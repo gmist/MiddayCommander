@@ -392,9 +392,13 @@ func renderWithHighlights(s string, matchIdxs []int, normal, highlight lipgloss.
 }
 
 func padStr(s string, width int) string {
+	if width < 1 {
+		return ""
+	}
 	w := ansi.StringWidth(s)
 	if w >= width {
-		return ansi.Truncate(s, width, "")
+		out := ansi.Truncate(s, width, "")
+		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
 	}
 	return s + strings.Repeat(" ", width-w)
 }

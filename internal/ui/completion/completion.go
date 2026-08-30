@@ -51,11 +51,16 @@ func CommonPrefix(strs []string) string {
 }
 
 func PadOrTrim(s string, width int) string {
+	if width < 1 {
+		return ""
+	}
 	if lipgloss.Width(s) > width {
 		if width > 3 {
-			return ansi.Truncate(s, width-3, "") + "..."
+			out := ansi.Truncate(s, width-3, "") + "..."
+			return out + strings.Repeat(" ", width-ansi.StringWidth(out))
 		}
-		return ansi.Truncate(s, width, "")
+		out := ansi.Truncate(s, width, "")
+		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
 	}
 	return s + strings.Repeat(" ", width-lipgloss.Width(s))
 }
