@@ -104,6 +104,10 @@ func RenderBox(title string, contentLines []string, footer string, width, height
 
 // TruncateLeftEllipsis keeps the right-most cells of s, prefixing with an
 // ellipsis if clipped. It never returns wider than width cells.
+//
+// The U+2026 glyph is intentional: left-truncation of paths has used it
+// since the initial import, right-truncation keeps ASCII "..." (see
+// PadOrTruncEllipsis). Counted as one cell, matching the renderer
 func TruncateLeftEllipsis(s string, width int) string {
 	const ellipsis = "…" // U+2026 horizontal ellipsis - one cell wide
 	if width < 1 {
