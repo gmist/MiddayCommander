@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/config"
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
@@ -168,9 +169,9 @@ func renderColumn(entries []entry, colW int, bgStyle, headStyle, keyStyle, dimSt
 		if labelWidth < 1 {
 			labelWidth = 1
 		}
-		label := fmt.Sprintf(" %-*s", labelWidth, e.label)
-		if len(label) > labelWidth+1 {
-			label = label[:labelWidth+1]
+		label := " " + e.label
+		if ansi.StringWidth(label) > labelWidth+1 {
+			label = ansi.Truncate(label, labelWidth+1, "")
 		}
 		line := dimStyle.Render(label) + keysStr + bgStyle.Render(" ")
 		lineW := lipgloss.Width(line)

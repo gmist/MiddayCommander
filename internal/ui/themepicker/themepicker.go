@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
@@ -234,9 +235,9 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		}
 
 		display := entry.Name
-		maxNameW := innerW - 4 - len(tag) // 3-cell gutter + 1-col right margin
-		if len(display) > maxNameW {
-			display = display[:maxNameW-3] + "..."
+		maxNameW := innerW - 4 - ansi.StringWidth(tag) // 3-cell gutter + 1-col right margin
+		if ansi.StringWidth(display) > maxNameW {
+			display = overlay.PadOrTruncEllipsis(display, maxNameW)
 		}
 
 		if isCursor {

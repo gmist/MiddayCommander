@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/ui/completion"
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
@@ -238,8 +239,8 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 
 	// Directory line
 	dir := m.dir
-	if len(dir) > innerW-2 {
-		dir = "..." + dir[len(dir)-innerW+5:]
+	if ansi.StringWidth(dir) > innerW-2 {
+		dir = overlay.TruncateLeftEllipsis(dir, innerW-2)
 	}
 	dirLine := dimStyle.Render(" " + dir)
 	dirWidth := lipgloss.Width(dirLine)
@@ -286,8 +287,8 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		}
 		for i := m.outputOffset; i < end; i++ {
 			line := " " + m.outputLines[i]
-			if lipgloss.Width(line) > innerW {
-				line = line[:innerW]
+			if ansi.StringWidth(line) > innerW {
+				line = ansi.Truncate(line, innerW, "")
 			}
 			rendered := bgStyle.Render(line)
 			renderedWidth := lipgloss.Width(rendered)
