@@ -131,7 +131,9 @@ func TruncateLeftEllipsis(s string, width int) string {
 		n++
 		tail = ansi.TruncateLeft(s, n, "")
 	}
-	return ellipsis + tail
+	// A cluster boundary can also land short of the budget, leaving the
+	// result one cell narrower. Left-pad the tail so the total is exact
+	return ellipsis + strings.Repeat(" ", width-1-ansi.StringWidth(tail)) + tail
 }
 
 // PadOrTrunc pads s with trailing spaces to exactly width cells, truncating
