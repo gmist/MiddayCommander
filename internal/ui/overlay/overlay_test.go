@@ -121,3 +121,27 @@ func TestTruncateLeftEllipsis(t *testing.T) {
 		})
 	}
 }
+
+func TestTruncateLeftEllipsisNarrowWideTail(t *testing.T) {
+	tests := []struct {
+		name  string
+		s     string
+		width int
+		want  string
+	}{
+		{"cjk tail does not loop", "日本", 2, "… "},
+		{"emoji tail does not loop", "report🎉", 2, "… "},
+		{"wide tail fits with two cells", "日本", 3, "…本"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TruncateLeftEllipsis(tt.s, tt.width)
+			if got != tt.want {
+				t.Errorf("TruncateLeftEllipsis(%q, %d) = %q, want %q", tt.s, tt.width, got, tt.want)
+			}
+			if w := ansi.StringWidth(got); w != tt.width {
+				t.Errorf("TruncateLeftEllipsis(%q, %d) width = %d, want %d", tt.s, tt.width, w, tt.width)
+			}
+		})
+	}
+}
