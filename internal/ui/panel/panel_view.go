@@ -28,6 +28,9 @@ func (m Model) View(th theme.Theme) string {
 	}
 
 	innerWidth := m.width - 2 // account for left+right border chars
+	if innerWidth < 0 {
+		innerWidth = 0
+	}
 
 	// Header: current path (show archive name when inside one)
 	header := m.path
@@ -121,14 +124,24 @@ func (m Model) renderRow(idx, width int, th theme.Theme) string {
 	sizeWidth := 7
 	nameWidth := width - sizeWidth - timeWidth - 2 // 2 spaces between columns
 	if nameWidth < 4 {
-		nameWidth = 4
+		timeWidth = 0
+		nameWidth = width - sizeWidth - 1
+		if nameWidth < 4 {
+			sizeWidth = 0
+			nameWidth = width
+		}
+	}
+	if nameWidth < 1 {
+		return ""
 	}
 
-	namePart := overlay.PadOrTruncEllipsis(name, nameWidth)
-	sizePart := overlay.PadLeft(sizeStr, sizeWidth)
-	timePart := overlay.PadOrTruncEllipsis(timeStr, timeWidth)
-
-	line := namePart + " " + sizePart + " " + timePart
+	line := overlay.PadOrTruncEllipsis(name, nameWidth)
+	if sizeWidth > 0 {
+		line += " " + overlay.PadLeft(sizeStr, sizeWidth)
+		if timeWidth > 0 {
+			line += " " + overlay.PadOrTruncEllipsis(timeStr, timeWidth)
+		}
+	}
 
 	// Style based on state
 	var style lipgloss.Style
