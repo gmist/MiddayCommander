@@ -204,7 +204,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 
 		var line string
 		if isCursor {
-			line = cursorStyle.Render(padStr(" "+display, innerW))
+			line = cursorStyle.Render(overlay.PadOrTrunc(" "+display, innerW))
 		} else {
 			line = renderWithHighlights(" "+display, shiftIdxs(mt.matchIdxs, 1), normalStyle, matchHLStyle, innerW)
 		}
@@ -389,16 +389,4 @@ func renderWithHighlights(s string, matchIdxs []int, normal, highlight lipgloss.
 		rendered += normal.Render(strings.Repeat(" ", width-visWidth))
 	}
 	return rendered
-}
-
-func padStr(s string, width int) string {
-	if width < 1 {
-		return ""
-	}
-	w := ansi.StringWidth(s)
-	if w >= width {
-		out := ansi.Truncate(s, width, "")
-		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
-	}
-	return s + strings.Repeat(" ", width-w)
 }

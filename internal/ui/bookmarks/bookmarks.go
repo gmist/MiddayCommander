@@ -295,9 +295,9 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 
 		line := prefix + display
 		if isCursor {
-			contentLines = append(contentLines, cursorStyle.Render(padStr(line, innerW)))
+			contentLines = append(contentLines, cursorStyle.Render(overlay.PadOrTrunc(line, innerW)))
 		} else {
-			contentLines = append(contentLines, numStyle.Render(prefix)+bgStyle.Render(padStr(display, innerW-len(prefix))))
+			contentLines = append(contentLines, numStyle.Render(prefix)+bgStyle.Render(overlay.PadOrTrunc(display, innerW-len(prefix))))
 		}
 	}
 
@@ -332,16 +332,4 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 
 	return overlay.RenderBox("Bookmarks", contentLines, footer, boxW, boxH,
 		accent, bg, highlight)
-}
-
-func padStr(s string, width int) string {
-	if width < 1 {
-		return ""
-	}
-	w := ansi.StringWidth(s)
-	if w >= width {
-		out := ansi.Truncate(s, width, "")
-		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
-	}
-	return s + strings.Repeat(" ", width-w)
 }

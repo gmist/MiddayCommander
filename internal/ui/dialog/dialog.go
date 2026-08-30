@@ -383,7 +383,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 			// Format suggestions compactly (multiple per line) like Ctrl+R
 			formatted := completion.FormatSuggestions(m.suggestions, innerW-2, 6, true)
 			for _, suggLine := range formatted {
-				sugLine := completion.PadOrTrim(suggLine, innerW-1)
+				sugLine := overlay.PadOrTruncEllipsis(suggLine, innerW-1)
 				contentLines = append(contentLines, bgStyle.Render(" "+sugLine))
 			}
 		}
@@ -391,7 +391,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 	default:
 		// Message on its own line(s) for non-input dialogs
 		for _, msgLine := range wrapText(m.message, innerW-2) {
-			line := bgStyle.Render(" " + padRight(msgLine, innerW-1))
+			line := bgStyle.Render(" " + overlay.PadOrTrunc(msgLine, innerW-1))
 			contentLines = append(contentLines, line)
 		}
 	}
@@ -422,7 +422,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		}
 		fileLabel = truncateLeft(fileLabel, innerW-2)
 		contentLines = append(contentLines,
-			bgStyle.Render(" "+padRight(fileLabel, innerW-1)))
+			bgStyle.Render(" "+overlay.PadOrTrunc(fileLabel, innerW-1)))
 
 		// Per-file bar
 		var fileFrac float64
@@ -445,7 +445,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		}
 		totalLabel = truncateLeft(totalLabel, innerW-2)
 		contentLines = append(contentLines,
-			bgStyle.Render(" "+padRight(totalLabel, innerW-1)))
+			bgStyle.Render(" "+overlay.PadOrTrunc(totalLabel, innerW-1)))
 
 		// Total bar
 		var totalFrac float64
@@ -533,18 +533,6 @@ func formatBytes(n int64) string {
 // truncateLeft keeps the right-most cells, prefixing with an ellipsis if clipped.
 func truncateLeft(s string, width int) string {
 	return overlay.TruncateLeftEllipsis(s, width)
-}
-
-func padRight(s string, width int) string {
-	if width < 1 {
-		return ""
-	}
-	w := ansi.StringWidth(s)
-	if w >= width {
-		out := ansi.Truncate(s, width, "")
-		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
-	}
-	return s + strings.Repeat(" ", width-w)
 }
 
 func wrapText(text string, width int) []string {

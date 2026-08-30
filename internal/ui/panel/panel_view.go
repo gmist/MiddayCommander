@@ -43,7 +43,7 @@ func (m Model) View(th theme.Theme) string {
 		header = overlay.TruncateLeftEllipsis(header, innerWidth-4)
 	}
 	headerLine := borderStyle.Render("┌") +
-		headerStyle.Render(" "+truncOrPad(header, innerWidth-2)+" ") +
+		headerStyle.Render(" "+overlay.PadOrTruncEllipsis(header, innerWidth-2)+" ") +
 		borderStyle.Render("┐")
 
 	// File list rows. The vertical bar is styled once and reused: it is the
@@ -82,7 +82,7 @@ func (m Model) View(th theme.Theme) string {
 		}
 	}
 	footerLine := borderStyle.Render("└") +
-		headerStyle.Render(truncOrPad(footerText, innerWidth)) +
+		headerStyle.Render(overlay.PadOrTruncEllipsis(footerText, innerWidth)) +
 		borderStyle.Render("┘")
 
 	// Assemble
@@ -124,9 +124,9 @@ func (m Model) renderRow(idx, width int, th theme.Theme) string {
 		nameWidth = 4
 	}
 
-	namePart := truncOrPad(name, nameWidth)
-	sizePart := padLeft(sizeStr, sizeWidth)
-	timePart := truncOrPad(timeStr, timeWidth)
+	namePart := overlay.PadOrTruncEllipsis(name, nameWidth)
+	sizePart := overlay.PadLeft(sizeStr, sizeWidth)
+	timePart := overlay.PadOrTruncEllipsis(timeStr, timeWidth)
 
 	line := namePart + " " + sizePart + " " + timePart
 
@@ -154,34 +154,6 @@ func (m Model) renderRow(idx, width int, th theme.Theme) string {
 	}
 
 	return style.Render(line)
-}
-
-func truncOrPad(s string, width int) string {
-	if width < 1 {
-		return ""
-	}
-	w := ansi.StringWidth(s)
-	if w > width {
-		if width > 3 {
-			out := ansi.Truncate(s, width-3, "") + "..."
-			return out + strings.Repeat(" ", width-ansi.StringWidth(out))
-		}
-		out := ansi.Truncate(s, width, "")
-		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
-	}
-	return s + strings.Repeat(" ", width-w)
-}
-
-func padLeft(s string, width int) string {
-	if width < 1 {
-		return ""
-	}
-	w := ansi.StringWidth(s)
-	if w >= width {
-		out := ansi.Truncate(s, width, "")
-		return strings.Repeat(" ", width-ansi.StringWidth(out)) + out
-	}
-	return strings.Repeat(" ", width-w) + s
 }
 
 func isExecutable(mode fs.FileMode) bool {

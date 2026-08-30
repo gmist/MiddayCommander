@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/config"
+	"github.com/kooler/MiddayCommander/internal/ui/overlay"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
 
@@ -161,23 +161,11 @@ func View(th theme.Theme, width int, items []Item) string {
 		if labelWidth < 0 {
 			labelWidth = 0
 		}
-		labelStr := th.StatusBar.Render(padOrTrunc(itm.Label, labelWidth))
+		labelStr := th.StatusBar.Render(overlay.PadOrTrunc(itm.Label, labelWidth))
 
 		b.WriteString(keyStr)
 		b.WriteString(labelStr)
 	}
 
 	return b.String()
-}
-
-func padOrTrunc(s string, width int) string {
-	if width < 1 {
-		return ""
-	}
-	w := ansi.StringWidth(s)
-	if w > width {
-		out := ansi.Truncate(s, width, "")
-		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
-	}
-	return s + strings.Repeat(" ", width-w)
 }

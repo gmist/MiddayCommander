@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kooler/MiddayCommander/internal/ui/overlay"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
 
@@ -181,7 +182,7 @@ func (m Model) View(th theme.Theme, focused bool) string {
 	// Header: filename + preview tag.
 	header := m.name + " [preview]"
 	headerLine := borderStyle.Render("┌") +
-		headerStyle.Render(" "+truncOrPad(header, innerWidth-2)+" ") +
+		headerStyle.Render(" "+overlay.PadOrTruncEllipsis(header, innerWidth-2)+" ") +
 		borderStyle.Render("┐")
 
 	// Body.
@@ -201,7 +202,7 @@ func (m Model) View(th theme.Theme, focused bool) string {
 
 	// Footer.
 	footerLine := borderStyle.Render("└") +
-		headerStyle.Render(truncOrPad(m.footerText(), innerWidth)) +
+		headerStyle.Render(overlay.PadOrTruncEllipsis(m.footerText(), innerWidth)) +
 		borderStyle.Render("┘")
 
 	parts := []string{headerLine}
@@ -215,7 +216,7 @@ func (m Model) contentLines(width int, normal lipgloss.Style) []string {
 	render := func(ss []string) []string {
 		out := make([]string, len(ss))
 		for i, s := range ss {
-			out[i] = normal.Render(truncOrPad(s, width))
+			out[i] = normal.Render(overlay.PadOrTruncEllipsis(s, width))
 		}
 		return out
 	}
@@ -303,22 +304,6 @@ func splitLines(b []byte) []string {
 	s := strings.ReplaceAll(string(b), "\r\n", "\n")
 	s = strings.ReplaceAll(s, "\t", "    ")
 	return strings.Split(s, "\n")
-}
-
-func truncOrPad(s string, width int) string {
-	if width < 0 {
-		width = 0
-	}
-	w := ansi.StringWidth(s)
-	if w > width {
-		if width > 3 {
-			out := ansi.Truncate(s, width-3, "") + "..."
-			return out + strings.Repeat(" ", width-ansi.StringWidth(out))
-		}
-		out := ansi.Truncate(s, width, "")
-		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
-	}
-	return s + strings.Repeat(" ", width-w)
 }
 
 func formatSize(n int64) string {

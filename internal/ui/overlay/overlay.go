@@ -129,3 +129,50 @@ func TruncateLeftEllipsis(s string, width int) string {
 	}
 	return ellipsis + tail
 }
+
+// PadOrTrunc pads s with trailing spaces to exactly width cells, truncating
+// from the right when s is wider. The result is exactly width cells when
+// width >= 1 and empty otherwise.
+func PadOrTrunc(s string, width int) string {
+	if width < 1 {
+		return ""
+	}
+	w := ansi.StringWidth(s)
+	if w > width {
+		out := ansi.Truncate(s, width, "")
+		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
+	}
+	return s + strings.Repeat(" ", width-w)
+}
+
+// PadOrTruncEllipsis is PadOrTrunc, but clipped values end with "..." so the
+// cut stays visible. The result is exactly width cells when width >= 1.
+func PadOrTruncEllipsis(s string, width int) string {
+	if width < 1 {
+		return ""
+	}
+	w := ansi.StringWidth(s)
+	if w > width {
+		if width > 3 {
+			out := ansi.Truncate(s, width-3, "") + "..."
+			return out + strings.Repeat(" ", width-ansi.StringWidth(out))
+		}
+		out := ansi.Truncate(s, width, "")
+		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
+	}
+	return s + strings.Repeat(" ", width-w)
+}
+
+// PadLeft right-aligns s in width cells, clipping on the left edge when s is
+// wider. The result is exactly width cells when width >= 1.
+func PadLeft(s string, width int) string {
+	if width < 1 {
+		return ""
+	}
+	w := ansi.StringWidth(s)
+	if w >= width {
+		out := ansi.Truncate(s, width, "")
+		return strings.Repeat(" ", width-ansi.StringWidth(out)) + out
+	}
+	return strings.Repeat(" ", width-w) + s
+}
