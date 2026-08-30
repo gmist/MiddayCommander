@@ -104,9 +104,10 @@ func dismiss() tea.Msg { return DismissMsg{} }
 
 // BoxSize returns the desired box dimensions.
 func (m Model) BoxSize(screenWidth, screenHeight int) (int, int) {
-	maxLen := len(helpText)
+	maxLen := ansi.StringWidth(helpText)
 	for _, p := range m.paths {
-		if l := len(p) + 2; l > maxLen { // +2 for the cursor/selection prefix
+		l := ansi.StringWidth(p) + 2 // +2 for the cursor/selection prefix
+		if l > maxLen {
 			maxLen = l
 		}
 	}

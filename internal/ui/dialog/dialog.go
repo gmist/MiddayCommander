@@ -53,13 +53,13 @@ type Model struct {
 	suggestions []string
 
 	// Progress dialog
-	totalFiles     int
-	doneFiles      int
-	totalBytes     int64
-	doneBytes      int64
-	fileTotalBytes int64
-	fileDoneBytes  int64
-	current        string
+	totalFiles      int
+	doneFiles       int
+	totalBytes      int64
+	doneBytes       int64
+	fileTotalBytes  int64
+	fileDoneBytes   int64
+	current         string
 	cancelRequested bool
 
 	// State
@@ -203,23 +203,27 @@ func (m *Model) updateInput(msg tea.KeyMsg) tea.Cmd {
 			})
 		}
 	case "backspace":
-		if m.inputPos > 0 {
-			m.input = m.input[:m.inputPos-1] + m.input[m.inputPos:]
-			m.inputPos--
+		start := prevCluster(m.input, m.inputPos)
+		if start >= 0 {
+			m.input = m.input[:start] + m.input[m.inputPos:]
+			m.inputPos = start
 		}
 		m.updateSuggestions()
 	case "delete":
-		if m.inputPos < len(m.input) {
-			m.input = m.input[:m.inputPos] + m.input[m.inputPos+1:]
+		end := nextCluster(m.input, m.inputPos)
+		if end > m.inputPos {
+			m.input = m.input[:m.inputPos] + m.input[end:]
 		}
 		m.updateSuggestions()
 	case "left":
-		if m.inputPos > 0 {
-			m.inputPos--
+		start := prevCluster(m.input, m.inputPos)
+		if start >= 0 {
+			m.inputPos = start
 		}
 	case "right":
-		if m.inputPos < len(m.input) {
-			m.inputPos++
+		end := nextCluster(m.input, m.inputPos)
+		if end > m.inputPos {
+			m.inputPos = end
 		}
 	case "home":
 		m.inputPos = 0
@@ -233,6 +237,38 @@ func (m *Model) updateInput(msg tea.KeyMsg) tea.Cmd {
 		}
 	}
 	return nil
+}
+
+// prevCluster returns the byte index of the grapheme cluster boundary
+// before pos, or -1 if pos is already at the start
+func prevCluster(s string, pos int) int {
+	if pos <= 0 {
+		return -1
+	}
+	if pos > len(s) {
+		pos = len(s)
+	}
+	prev, b := 0, 0
+	for b < pos {
+		c, _ := ansi.FirstGraphemeCluster(s[b:], ansi.GraphemeWidth)
+		next := b + len(c)
+		if next >= pos {
+			break
+		}
+		prev = next
+		b = next
+	}
+	return prev
+}
+
+// nextCluster returns the byte index after the grapheme cluster at pos, or
+// pos when already at the end
+func nextCluster(s string, pos int) int {
+	if pos >= len(s) {
+		return pos
+	}
+	c, _ := ansi.FirstGraphemeCluster(s[pos:], ansi.GraphemeWidth)
+	return pos + len(c)
 }
 
 func (m *Model) updateSuggestions() {
@@ -334,40 +370,64 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 	case KindInput:
 		// Message label and input with cursor at inputPos
 		label := " " + m.message + " "
-		labelW := len(label)
+		labelW := lipgloss.Width(label)
 		maxInput := innerW - labelW
 		if maxInput < 1 {
 			maxInput = 1
 		}
 
-		// Determine visible window of text around the cursor.
-		visStart := 0
-		visEnd := len(m.input)
-		if visEnd-visStart > maxInput {
-			// Keep cursor visible with some context on both sides.
-			visStart = m.inputPos - maxInput/2
-			if visStart < 0 {
-				visStart = 0
+		// Determine visible window of the input around the cursor
+		// Cutting happens on grapheme cluster boundaries only so emoji
+		// sequences (ZWJ, VS16, flags) are never split mid-emoji
+		var clusters []string
+		for i := 0; i < len(m.input); {
+			c, _ := ansi.FirstGraphemeCluster(m.input[i:], ansi.GraphemeWidth)
+			clusters = append(clusters, c)
+			i += len(c)
+		}
+		widthOf := func(ss []string) int {
+			return ansi.StringWidth(strings.Join(ss, ""))
+		}
+		// Keep the cursor cell in mind - at the end of input it shows
+		// as a space next to the window so the window width shrinks by 1
+		if m.inputPos >= len(m.input) && maxInput > 1 {
+			maxInput--
+		}
+		// Cursor cluster index: the cluster containing m.inputPos
+		cursorIdx := len(clusters)
+		for i, byteAt := 0, 0; i < len(clusters); i++ {
+			if byteAt == m.inputPos {
+				cursorIdx = i
+				break
 			}
-			visEnd = visStart + maxInput
-			if visEnd > len(m.input) {
-				visEnd = len(m.input)
-				visStart = visEnd - maxInput
-				if visStart < 0 {
-					visStart = 0
+			byteAt += len(clusters[i])
+		}
+		visStart, visEnd := 0, len(clusters)
+		w := widthOf(clusters)
+		if w > maxInput {
+			// Walk the left edge right while the cursor side overflows
+			for widthOf(clusters[visStart:]) > maxInput && visStart < cursorIdx {
+				visStart++
+			}
+			// Extend the right edge while the window fits
+			for visEnd = visStart + 1; visEnd < len(clusters); visEnd++ {
+				if widthOf(clusters[visStart:visEnd+1]) > maxInput {
+					break
 				}
 			}
 		}
+		visStartByte := len(strings.Join(clusters[:visStart], ""))
+		visEndByte := len(strings.Join(clusters[:visEnd], ""))
 
 		cursorStyle := lipgloss.NewStyle().Background(highlight).Foreground(bg)
-		before := m.input[visStart:m.inputPos]
+		before := m.input[visStartByte:m.inputPos]
 		after := ""
 		cursorCh := " "
 		if m.inputPos < len(m.input) {
-			cursorCh = string(m.input[m.inputPos])
-			after = m.input[m.inputPos+1 : visEnd]
-		} else if visEnd < len(m.input) {
-			after = m.input[m.inputPos:visEnd]
+			cursorCh = clusters[cursorIdx]
+			after = m.input[m.inputPos+len(cursorCh) : visEndByte]
+		} else if visEndByte < len(m.input) {
+			after = m.input[m.inputPos:visEndByte]
 		}
 		line := dimStyle.Render(label) +
 			inputStyle.Render(before) +
@@ -420,7 +480,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 			fileLabel += fmt.Sprintf("  (%s / %s)",
 				formatBytes(m.fileDoneBytes), formatBytes(m.fileTotalBytes))
 		}
-		fileLabel = truncateLeft(fileLabel, innerW-2)
+		fileLabel = overlay.TruncateLeftEllipsis(fileLabel, innerW-2)
 		contentLines = append(contentLines,
 			bgStyle.Render(" "+overlay.PadOrTrunc(fileLabel, innerW-1)))
 
@@ -443,7 +503,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		if m.cancelRequested {
 			totalLabel += "   [cancelling…]"
 		}
-		totalLabel = truncateLeft(totalLabel, innerW-2)
+		totalLabel = overlay.TruncateLeftEllipsis(totalLabel, innerW-2)
 		contentLines = append(contentLines,
 			bgStyle.Render(" "+overlay.PadOrTrunc(totalLabel, innerW-1)))
 
@@ -528,11 +588,6 @@ func formatBytes(n int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGTPE"[exp])
-}
-
-// truncateLeft keeps the right-most cells, prefixing with an ellipsis if clipped.
-func truncateLeft(s string, width int) string {
-	return overlay.TruncateLeftEllipsis(s, width)
 }
 
 func wrapText(text string, width int) []string {

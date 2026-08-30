@@ -132,7 +132,7 @@ func TruncateLeftEllipsis(s string, width int) string {
 
 // PadOrTrunc pads s with trailing spaces to exactly width cells, truncating
 // from the right when s is wider. The result is exactly width cells when
-// width >= 1 and empty otherwise.
+// width >= 1 and empty otherwise
 func PadOrTrunc(s string, width int) string {
 	if width < 1 {
 		return ""
@@ -146,7 +146,7 @@ func PadOrTrunc(s string, width int) string {
 }
 
 // PadOrTruncEllipsis is PadOrTrunc, but clipped values end with "..." so the
-// cut stays visible. The result is exactly width cells when width >= 1.
+// cut stays visible. The result is exactly width cells when width >= 1
 func PadOrTruncEllipsis(s string, width int) string {
 	if width < 1 {
 		return ""
@@ -164,7 +164,7 @@ func PadOrTruncEllipsis(s string, width int) string {
 }
 
 // PadLeft right-aligns s in width cells, clipping on the left edge when s is
-// wider. The result is exactly width cells when width >= 1.
+// wider. The result is exactly width cells when width >= 1
 func PadLeft(s string, width int) string {
 	if width < 1 {
 		return ""
