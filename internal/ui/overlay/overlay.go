@@ -34,7 +34,8 @@ func Place(bg string, boxContent string, bgWidth, bgHeight, boxWidth, boxHeight 
 
 		bgLine := bgLines[bgIdx]
 
-		// ANSI-aware slicing: left portion of bg, then the fg box line, then right portion of bg
+		// Cell- and grapheme-aware slicing: keep the left and right portions of
+		// the background around the foreground box without breaking ANSI escapes
 		left := ansi.Truncate(bgLine, xOff, "")
 		right := ansi.Cut(bgLine, xOff+boxWidth, bgWidth)
 
