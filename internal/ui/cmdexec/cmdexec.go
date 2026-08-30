@@ -185,19 +185,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 
 	default:
-		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
-			s := string(msg.Runes)
-			if msg.Type == tea.KeySpace {
-				s = " "
-			}
-			if s == "" {
-				break
-			}
-			for _, r := range s {
-				if r < 32 {
-					return m, nil
-				}
-			}
+		if s, ok := uitext.PrintableInput(msg); ok {
 			if m.inputPos < 0 {
 				m.inputPos = 0
 			} else if m.inputPos > len(m.input) {

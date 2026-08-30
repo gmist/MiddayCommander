@@ -89,7 +89,7 @@ func (m Model) Update(msg tea.KeyMsg) (Model, tea.Cmd) {
 				m.clampOffset()
 			}
 		default:
-			if s, ok := printableInput(msg); ok {
+			if s, ok := uitext.PrintableInput(msg); ok {
 				m.filter += s
 				m.refilter()
 			}
@@ -159,30 +159,11 @@ func (m Model) updateAdding(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 	default:
-		if s, ok := printableInput(msg); ok {
+		if s, ok := uitext.PrintableInput(msg); ok {
 			m.addName += s
 		}
 		return m, nil
 	}
-}
-
-func printableInput(msg tea.KeyMsg) (string, bool) {
-	if msg.Type != tea.KeyRunes && msg.Type != tea.KeySpace {
-		return "", false
-	}
-	s := string(msg.Runes)
-	if msg.Type == tea.KeySpace {
-		s = " "
-	}
-	if s == "" {
-		return "", false
-	}
-	for _, r := range s {
-		if r < 32 {
-			return "", false
-		}
-	}
-	return s, true
 }
 
 func (m *Model) refilter() {
