@@ -536,6 +536,9 @@ func truncateLeft(s string, width int) string {
 }
 
 func wrapText(text string, width int) []string {
+	if width < 1 {
+		width = 1
+	}
 	if ansi.StringWidth(text) <= width {
 		return []string{text}
 	}
@@ -549,6 +552,18 @@ func wrapText(text string, width int) []string {
 		}
 		if cut == 0 {
 			cut = len(head)
+			if cut == 0 {
+				n := 1
+				tail := ansi.TruncateLeft(text, n, "")
+				for len(tail) == len(text) && n < ansi.StringWidth(text) {
+					n++
+					tail = ansi.TruncateLeft(text, n, "")
+				}
+				cut = len(text) - len(tail)
+				if cut == 0 {
+					cut = 1
+				}
+			}
 		}
 		lines = append(lines, text[:cut])
 		text = strings.TrimLeft(text[cut:], " ")
