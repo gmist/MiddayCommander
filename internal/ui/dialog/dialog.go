@@ -230,9 +230,26 @@ func (m *Model) updateInput(msg tea.KeyMsg) tea.Cmd {
 	case "end":
 		m.inputPos = len(m.input)
 	default:
-		if len(msg.String()) == 1 && msg.String()[0] >= 32 {
-			m.input = m.input[:m.inputPos] + msg.String() + m.input[m.inputPos:]
-			m.inputPos++
+		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
+			s := string(msg.Runes)
+			if msg.Type == tea.KeySpace {
+				s = " "
+			}
+			if s == "" {
+				break
+			}
+			for _, r := range s {
+				if r < 32 {
+					return nil
+				}
+			}
+			if m.inputPos < 0 {
+				m.inputPos = 0
+			} else if m.inputPos > len(m.input) {
+				m.inputPos = len(m.input)
+			}
+			m.input = m.input[:m.inputPos] + s + m.input[m.inputPos:]
+			m.inputPos += len(s)
 			m.updateSuggestions()
 		}
 	}

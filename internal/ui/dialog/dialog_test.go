@@ -142,6 +142,36 @@ func TestInputCursorPlacement(t *testing.T) {
 	}
 }
 
+func TestInputUnicodeInsertion(t *testing.T) {
+	m := NewInput("Rename", "New name:", "ab", "rename")
+	press(&m, tea.KeyHome)
+	press(&m, tea.KeyRunes, '日', '本')
+	if m.input != "日本ab" {
+		t.Errorf("CJK insertion = %q, want 日本ab", m.input)
+	}
+	if m.inputPos != len("日本") {
+		t.Errorf("CJK input position = %d, want %d", m.inputPos, len("日本"))
+	}
+
+	press(&m, tea.KeyEnd)
+	press(&m, tea.KeyRunes, '🎉')
+	if m.input != "日本ab🎉" {
+		t.Errorf("emoji insertion = %q, want 日本ab🎉", m.input)
+	}
+	if m.inputPos != len(m.input) {
+		t.Errorf("emoji input position = %d, want %d", m.inputPos, len(m.input))
+	}
+}
+
+func TestInputSpaceInsertion(t *testing.T) {
+	m := NewInput("Rename", "New name:", "ab", "rename")
+	press(&m, tea.KeyHome)
+	press(&m, tea.KeySpace)
+	if m.input != " ab" {
+		t.Errorf("space insertion = %q, want %q", m.input, " ab")
+	}
+}
+
 // TestInputEmojiSequenceIntegrity ensures a ZWJ emoji sequence is removed
 // whole by a single backspace, never split mid-cluster.
 func TestInputEmojiSequenceIntegrity(t *testing.T) {
