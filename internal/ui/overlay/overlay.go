@@ -105,12 +105,8 @@ func RenderBox(title string, contentLines []string, footer string, width, height
 
 // TruncateLeftEllipsis keeps the right-most cells of s, prefixing with an
 // ellipsis if clipped. It never returns wider than width cells.
-//
-// The U+2026 glyph is intentional: left-truncation of paths has used it
-// since the initial import, right-truncation keeps ASCII "..." (see
-// PadOrTruncDots). Counted as one cell, matching the renderer
 func TruncateLeftEllipsis(s string, width int) string {
-	const ellipsis = "…" // U+2026 horizontal ellipsis - one cell wide
+	const ellipsis = "…"
 	if width < 1 {
 		return ""
 	}
@@ -122,21 +118,20 @@ func TruncateLeftEllipsis(s string, width int) string {
 		return ellipsis
 	}
 
-	n := w - (width - 1)
-	tail := ansi.TruncateLeft(s, n, "")
-	// If the cut intersects a wide grapheme, TruncateLeft keeps the whole
-	// grapheme, so the result can be wider than the requested cell count.
-	// Search only through the input's actual width; for a suffix that is
-	// itself wider than the available space, use an empty tail instead.
-	for ansi.StringWidth(tail) > width-1 && n < w {
-		n++
-		tail = ansi.TruncateLeft(s, n, "")
+	needToStrip := w - (width - 1)
+	strippedWidth := 0
+	for i := 0; i < len(s); {
+		cluster, gw := ansi.FirstGraphemeCluster(s[i:], ansi.GraphemeWidth)
+		strippedWidth += gw
+		if strippedWidth >= needToStrip {
+			break
+		}
+		i += len(cluster)
 	}
+	tail := ansi.TruncateLeft(s, strippedWidth, "")
 	if ansi.StringWidth(tail) > width-1 {
 		tail = ""
 	}
-	// A cluster boundary can also land short of the budget, leaving the
-	// result one cell narrower. Left-pad the tail so the total is exact
 	return ellipsis + strings.Repeat(" ", width-1-ansi.StringWidth(tail)) + tail
 }
 
