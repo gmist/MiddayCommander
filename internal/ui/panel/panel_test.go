@@ -13,6 +13,22 @@ import (
 	"github.com/kooler/MiddayCommander/internal/vfs/local"
 )
 
+// mustWrite and mustMkdir create fixture files, failing the test instead of
+// silently ignoring the error.
+func mustWrite(t *testing.T, path string, data []byte, mode os.FileMode) {
+	t.Helper()
+	if err := os.WriteFile(path, data, mode); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustMkdir(t *testing.T, path string) {
+	t.Helper()
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // newTestModel builds a panel.Model populated with real directory entries
 // so renderRow and View can be exercised against actual fs.DirEntry / fs.FileInfo.
 func newTestModel(t *testing.T, dir string) Model {
@@ -58,8 +74,8 @@ func rowWidth(t *testing.T, row string) int {
 // wide grapheme (CJK / emoji) that gets truncated.
 func TestRenderRowWidth(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "report.pdf"), []byte("x"), 0644)
-	os.Mkdir(filepath.Join(dir, "subdir"), 0755)
+	mustWrite(t, filepath.Join(dir, "report.pdf"), []byte("x"), 0o644)
+	mustMkdir(t, filepath.Join(dir, "subdir"))
 
 	th := theme.Default()
 
@@ -97,8 +113,8 @@ func TestRenderRowWidth(t *testing.T) {
 // collapse size / time columns without breaking or returning the wrong width.
 func TestRenderRowNarrow(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("x"), 0644)
-	os.Mkdir(filepath.Join(dir, "b_dir"), 0755)
+	mustWrite(t, filepath.Join(dir, "a.txt"), []byte("x"), 0o644)
+	mustMkdir(t, filepath.Join(dir, "b_dir"))
 
 	th := theme.Default()
 	m := newTestModel(t, dir)
@@ -138,9 +154,12 @@ func TestRenderRowNarrow(t *testing.T) {
 // start at the same cell regardless of filename cell width.
 func TestRenderRowColumnAlignment(t *testing.T) {
 	dir := t.TempDir()
-	info, _ := os.Stat(filepath.Join(dir, "short.txt"))
-	os.WriteFile(filepath.Join(dir, "short.txt"), []byte("x"), 0644)
-	os.Mkdir(filepath.Join(dir, "wide"), 0755)
+	mustWrite(t, filepath.Join(dir, "short.txt"), []byte("x"), 0o644)
+	mustMkdir(t, filepath.Join(dir, "wide"))
+	info, err := os.Stat(filepath.Join(dir, "short.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	th := theme.Default()
 	m := newTestModel(t, dir)
@@ -183,7 +202,7 @@ func TestRenderRowColumnAlignment(t *testing.T) {
 func TestRenderRowStates(t *testing.T) {
 	dir := t.TempDir()
 	binPath := filepath.Join(dir, "run.sh")
-	os.WriteFile(binPath, []byte("#!/bin/sh\necho hi\n"), 0755)
+	mustWrite(t, binPath, []byte("#!/bin/sh\necho hi\n"), 0o755)
 	info, _ := os.Stat(binPath)
 
 	th := theme.Default()
