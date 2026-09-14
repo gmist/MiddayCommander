@@ -50,16 +50,18 @@ type Model struct {
 	inputPos    int
 	basePath    string
 	suggestions []string
+	masked      bool // render the text as dots, for passphrases
 
 	// Progress dialog
-	totalFiles     int
-	doneFiles      int
-	totalBytes     int64
-	doneBytes      int64
-	fileTotalBytes int64
-	fileDoneBytes  int64
-	current        string
+	totalFiles      int
+	doneFiles       int
+	totalBytes      int64
+	doneBytes       int64
+	fileTotalBytes  int64
+	fileDoneBytes   int64
+	current         string
 	cancelRequested bool
+	connecting      bool // progress dialog with no measurable progress
 
 	// State
 	done     bool
@@ -98,6 +100,19 @@ func NewInputWithBase(title, message, defaultValue, tag, basePath string) Model 
 	}
 }
 
+// NewPassword hides the text on screen, for key passphrases. The value is
+// never stored: it goes straight to the connection attempt.
+func NewPassword(title, message, tag string) Model {
+	return Model{
+		kind:    KindInput,
+		title:   title,
+		message: message,
+		tag:     tag,
+		masked:  true,
+		width:   58,
+	}
+}
+
 // NewError creates an error display dialog.
 func NewError(title, message string) Model {
 	return Model{
@@ -116,6 +131,13 @@ func NewProgress(title, tag string) Model {
 		tag:   tag,
 		width: 64,
 	}
+}
+
+// SetConnecting drops the bars for a plain waiting notice: a connection has
+// no byte count to show.
+func (m *Model) SetConnecting(target string) {
+	m.connecting = true
+	m.current = target
 }
 
 // Done returns true when the dialog has been dismissed.
@@ -225,13 +247,31 @@ func (m *Model) updateInput(msg tea.KeyMsg) tea.Cmd {
 	case "end":
 		m.inputPos = len(m.input)
 	default:
-		if len(msg.String()) == 1 && msg.String()[0] >= 32 {
-			m.input = m.input[:m.inputPos] + msg.String() + m.input[m.inputPos:]
-			m.inputPos++
-			m.updateSuggestions()
+		text := insertableText(msg)
+		if text == "" {
+			return nil
 		}
+		m.input = m.input[:m.inputPos] + text + m.input[m.inputPos:]
+		m.inputPos += len(text)
+		m.updateSuggestions()
 	}
 	return nil
+}
+
+// insertableText returns the characters a key carries, or "" if it is not
+// text. A paste arrives as one message of many runes, so the length is not
+// limited to one; a length test would drop pastes and non-ASCII characters.
+func insertableText(msg tea.KeyMsg) string {
+	if msg.Alt {
+		return ""
+	}
+	switch msg.Type {
+	case tea.KeyRunes:
+		return string(msg.Runes)
+	case tea.KeySpace:
+		return " "
+	}
+	return ""
 }
 
 func (m *Model) updateSuggestions() {
@@ -296,8 +336,12 @@ func (m Model) BoxSize(screenWidth, screenHeight int) (int, int) {
 	h := 2 + 1 + msgLines + 1 + 1 // borders + blank + content + blank + footer
 	switch m.kind {
 	case KindProgress:
-		// current file label + file bar + spacer + total label + total bar
-		h += 5
+		if m.connecting {
+			h++ // just the target line
+		} else {
+			// current file label + file bar + spacer + total label + total bar
+			h += 5
+		}
 	}
 	maxH := screenHeight * 3 / 4
 	if h > maxH {
@@ -339,9 +383,15 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 			maxInput = 1
 		}
 
+		// One single-byte star per byte keeps the cursor offsets below valid.
+		shown := m.input
+		if m.masked {
+			shown = strings.Repeat("*", len(m.input))
+		}
+
 		// Determine visible window of text around the cursor.
 		visStart := 0
-		visEnd := len(m.input)
+		visEnd := len(shown)
 		if visEnd-visStart > maxInput {
 			// Keep cursor visible with some context on both sides.
 			visStart = m.inputPos - maxInput/2
@@ -349,8 +399,8 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 				visStart = 0
 			}
 			visEnd = visStart + maxInput
-			if visEnd > len(m.input) {
-				visEnd = len(m.input)
+			if visEnd > len(shown) {
+				visEnd = len(shown)
 				visStart = visEnd - maxInput
 				if visStart < 0 {
 					visStart = 0
@@ -359,14 +409,14 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		}
 
 		cursorStyle := lipgloss.NewStyle().Background(highlight).Foreground(bg)
-		before := m.input[visStart:m.inputPos]
+		before := shown[visStart:m.inputPos]
 		after := ""
 		cursorCh := " "
-		if m.inputPos < len(m.input) {
-			cursorCh = string(m.input[m.inputPos])
-			after = m.input[m.inputPos+1 : visEnd]
-		} else if visEnd < len(m.input) {
-			after = m.input[m.inputPos:visEnd]
+		if m.inputPos < len(shown) {
+			cursorCh = string(shown[m.inputPos])
+			after = shown[m.inputPos+1 : visEnd]
+		} else if visEnd < len(shown) {
+			after = shown[m.inputPos:visEnd]
 		}
 		line := dimStyle.Render(label) +
 			inputStyle.Render(before) +
@@ -404,6 +454,12 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		// already rendered above
 
 	case KindProgress:
+		if m.connecting {
+			line := bgStyle.Render(" " + padRight(m.current, innerW-1))
+			contentLines = append(contentLines, line)
+			break
+		}
+
 		barWidth := innerW - 2
 		if barWidth < 1 {
 			barWidth = 1
@@ -433,8 +489,16 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		// Spacer
 		contentLines = append(contentLines, bgStyle.Render(strings.Repeat(" ", innerW)))
 
-		// Total summary line
-		totalLabel := fmt.Sprintf("Total: %d / %d files", m.doneFiles, m.totalFiles)
+		// A remote source has no pre-counted total, so show what is done.
+		var totalLabel string
+		if m.totalFiles > 0 {
+			totalLabel = fmt.Sprintf("Total: %d / %d files", m.doneFiles, m.totalFiles)
+		} else {
+			totalLabel = fmt.Sprintf("Total: %d files", m.doneFiles)
+			if m.doneBytes > 0 {
+				totalLabel += "   " + formatBytes(m.doneBytes)
+			}
+		}
 		if m.totalBytes > 0 {
 			totalLabel += fmt.Sprintf("   %s / %s",
 				formatBytes(m.doneBytes), formatBytes(m.totalBytes))
@@ -487,9 +551,8 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 			footer = keyStyle.Render(" Esc") + dimStyle.Render(":Cancel")
 		}
 	case KindError:
-		footer = keyStyle.Render(" Enter") + dimStyle.Render(":Close") +
-			dimStyle.Render("  ") +
-			keyStyle.Render("Esc") + dimStyle.Render(":Close")
+		// Enter and q also close; one hint is enough.
+		footer = keyStyle.Render(" Esc") + dimStyle.Render(":Close")
 	}
 	footerWidth := lipgloss.Width(footer)
 	if footerWidth < innerW {

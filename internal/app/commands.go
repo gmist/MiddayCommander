@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/kooler/MiddayCommander/internal/actions"
+	"github.com/kooler/MiddayCommander/internal/vfs"
 )
 
 // File operation result messages.
@@ -58,7 +59,7 @@ func sendProgress(ctx context.Context, ch chan actions.Progress) func(actions.Pr
 	}
 }
 
-func copyCmd(ctx context.Context, ch chan actions.Progress, sources []string, dest string) tea.Cmd {
+func copyCmd(ctx context.Context, ch chan actions.Progress, sources []vfs.FileRef, dest vfs.FileRef) tea.Cmd {
 	return func() tea.Msg {
 		err := actions.Copy(ctx, sources, dest, sendProgress(ctx, ch))
 		close(ch)
@@ -66,7 +67,7 @@ func copyCmd(ctx context.Context, ch chan actions.Progress, sources []string, de
 	}
 }
 
-func copyAsCmd(ctx context.Context, ch chan actions.Progress, source, destPath string) tea.Cmd {
+func copyAsCmd(ctx context.Context, ch chan actions.Progress, source, destPath vfs.FileRef) tea.Cmd {
 	return func() tea.Msg {
 		err := actions.CopyAs(ctx, source, destPath, sendProgress(ctx, ch))
 		close(ch)
@@ -74,7 +75,7 @@ func copyAsCmd(ctx context.Context, ch chan actions.Progress, source, destPath s
 	}
 }
 
-func moveCmd(ctx context.Context, ch chan actions.Progress, sources []string, dest string) tea.Cmd {
+func moveCmd(ctx context.Context, ch chan actions.Progress, sources []vfs.FileRef, dest vfs.FileRef) tea.Cmd {
 	return func() tea.Msg {
 		err := actions.Move(ctx, sources, dest, sendProgress(ctx, ch))
 		close(ch)
@@ -82,7 +83,7 @@ func moveCmd(ctx context.Context, ch chan actions.Progress, sources []string, de
 	}
 }
 
-func moveAsCmd(ctx context.Context, ch chan actions.Progress, source, destPath string) tea.Cmd {
+func moveAsCmd(ctx context.Context, ch chan actions.Progress, source, destPath vfs.FileRef) tea.Cmd {
 	return func() tea.Msg {
 		err := actions.MoveAs(ctx, source, destPath, sendProgress(ctx, ch))
 		close(ch)
@@ -90,24 +91,24 @@ func moveAsCmd(ctx context.Context, ch chan actions.Progress, source, destPath s
 	}
 }
 
-func deleteCmd(ctx context.Context, ch chan actions.Progress, paths []string) tea.Cmd {
+func deleteCmd(ctx context.Context, ch chan actions.Progress, refs []vfs.FileRef) tea.Cmd {
 	return func() tea.Msg {
-		err := actions.Delete(ctx, paths, sendProgress(ctx, ch))
+		err := actions.Delete(ctx, refs, sendProgress(ctx, ch))
 		close(ch)
 		return deleteDoneMsg{err: err}
 	}
 }
 
-func mkdirCmd(path string) tea.Cmd {
+func mkdirCmd(ref vfs.FileRef) tea.Cmd {
 	return func() tea.Msg {
-		err := actions.Mkdir(path)
+		err := actions.Mkdir(ref)
 		return mkdirDoneMsg{err: err}
 	}
 }
 
-func renameCmd(oldPath, newName string) tea.Cmd {
+func renameCmd(ref vfs.FileRef, newName string) tea.Cmd {
 	return func() tea.Msg {
-		err := actions.Rename(oldPath, newName)
+		err := actions.Rename(ref, newName)
 		return renameDoneMsg{err: err}
 	}
 }
@@ -243,17 +244,21 @@ func (m *Model) refreshBothPanels() tea.Cmd {
 	return tea.Batch(m.leftPanel.LoadDir(), m.rightPanel.LoadDir())
 }
 
-// inactivePanel returns the panel that does NOT have focus.
-func (m *Model) inactivePanel() string {
-	if m.focus == FocusLeft {
-		return m.rightPanel.Path()
-	}
-	return m.leftPanel.Path()
+// inactiveRef returns a reference to the directory shown in the panel that
+// does NOT have focus: the destination of a copy or move.
+func (m *Model) inactiveRef() vfs.FileRef {
+	return m.inactivePanelModel().Ref()
 }
 
-// selectedOrCurrent returns the currently selected/tagged paths from the active panel.
-func (m *Model) selectedOrCurrent() []string {
-	return m.activePanel().SelectedPaths()
+// inactivePanel returns the display path of the panel without focus.
+func (m *Model) inactivePanel() string {
+	return m.inactivePanelModel().Location().Display()
+}
+
+// selectedOrCurrent returns references to the tagged entries in the active
+// panel, or the entry under the cursor when nothing is tagged.
+func (m *Model) selectedOrCurrent() []vfs.FileRef {
+	return m.activePanel().SelectedRefs()
 }
 
 // currentFileName returns just the base name of the file under cursor.
@@ -265,14 +270,20 @@ func (m *Model) currentFileName() string {
 	return e.Name()
 }
 
-// currentFilePath returns the full path of the file under cursor.
+// currentFilePath returns the path of the file under cursor, within its own
+// filesystem. Only meaningful for local panels.
 func (m *Model) currentFilePath() string {
 	return m.activePanel().CurrentPath()
 }
 
-// activePanelMkdir returns the full path for a new directory in the active panel.
-func (m *Model) activePanelMkdir(name string) string {
-	return filepath.Join(m.activePanel().Path(), name)
+// currentFileRef returns a reference to the file under the cursor.
+func (m *Model) currentFileRef() vfs.FileRef {
+	return m.activePanel().CurrentRef()
+}
+
+// activePanelMkdir returns the ref for a new directory in the active panel.
+func (m *Model) activePanelMkdir(name string) vfs.FileRef {
+	return m.activePanel().Ref().Join(name)
 }
 
 // expandHome replaces a leading "~" with the user's home directory.

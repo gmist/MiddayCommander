@@ -109,6 +109,7 @@ func (m Model) rightEntries() []entry {
 		{"Toggle hidden files", fmtKeys(k.ToggleHidden)},
 		{"Fuzzy find", fmtKeys(k.FuzzyFind)},
 		{"Bookmarks", fmtKeys(k.Bookmarks)},
+		{"SSH servers", fmtKeys(k.Servers)},
 		{"Quick search", fmtKeys(k.QuickSearch)},
 		{"Theme picker", fmtKeys(k.ThemePicker)},
 		{"Run command", fmtKeys(k.CmdExec)},

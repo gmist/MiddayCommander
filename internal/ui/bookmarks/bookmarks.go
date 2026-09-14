@@ -22,17 +22,17 @@ type DismissMsg struct{}
 
 // Model is the bookmark list overlay.
 type Model struct {
-	store   *bookmark.Store
-	items   []bookmark.Bookmark
-	cursor  int
-	offset  int
-	width   int
-	height  int
+	store     *bookmark.Store
+	items     []bookmark.Bookmark
+	cursor    int
+	offset    int
+	width     int
+	height    int
 	filter    string // search/filter query
 	filtering bool   // true when filter input is active
 	adding    bool   // true when prompting for bookmark name
-	addPath string // path being bookmarked
-	addName string // name being typed
+	addPath   string // path being bookmarked
+	addName   string // name being typed
 }
 
 // New creates a new bookmark list overlay.

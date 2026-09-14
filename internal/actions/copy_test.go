@@ -31,7 +31,7 @@ func TestCopyReportsProgress(t *testing.T) {
 		}
 	}
 
-	if err := Copy(context.Background(), []string{src}, dst, progressFn); err != nil {
+	if err := Copy(context.Background(), refs(src), ref(dst), progressFn); err != nil {
 		t.Fatalf("copy: %v", err)
 	}
 	if lastBytes != 2*(1<<16) {
@@ -54,7 +54,7 @@ func TestCopyCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel before starting
 
-	err := Copy(ctx, []string{src}, dst, nil)
+	err := Copy(ctx, refs(src), ref(dst), nil)
 	if !errors.Is(err, ErrCancelled) {
 		t.Fatalf("want ErrCancelled, got %v", err)
 	}

@@ -1,21 +1,22 @@
 // Package quickview implements an embedded, read-only file preview that can
 // replace the inactive panel. It mirrors the panel's bordered box so the two
 // sit side-by-side seamlessly. Content follows the active panel's cursor and
-// is loaded synchronously as a bounded head of the file.
+// is a bounded head of the file. A local file is read inline; a remote one is
+// read by a command, because a network round trip must not block the event
+// loop.
 package quickview
 
 import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
+	"github.com/kooler/MiddayCommander/internal/vfs"
 )
 
 // maxPreviewBytes is how much of a file we read for the preview. We only ever
@@ -31,6 +32,7 @@ const (
 	kindEmpty
 	kindError
 	kindUnavailable
+	kindLoading
 )
 
 // Model is the file preview sub-model.
@@ -68,12 +70,20 @@ func (m Model) Focused() bool { return m.focused }
 // Path returns the file currently previewed.
 func (m Model) Path() string { return m.path }
 
-// SetFile loads the given path into the preview, resetting scroll. isDir marks a
-// directory selection; available is false when the path is not a real OS file
-// (e.g. inside an archive) and cannot be read.
-func (m *Model) SetFile(path string, info fs.FileInfo, isDir, available bool) {
-	m.path = path
-	m.name = filepath.Base(path)
+// FileLoadedMsg carries a preview read that happened off the event loop.
+type FileLoadedMsg struct {
+	Path      string
+	Data      []byte
+	Truncated bool
+	Err       error
+}
+
+// SetFile points the preview at an entry, resetting scroll. available is false
+// when the entry cannot be read at all, as inside an archive. A returned
+// command must be run: the content arrives as a FileLoadedMsg.
+func (m *Model) SetFile(ref vfs.FileRef, info fs.FileInfo, isDir, available bool) tea.Cmd {
+	m.path = ref.Path
+	m.name = ref.Base()
 	m.info = info
 	m.offset = 0
 	m.truncated = false
@@ -85,30 +95,57 @@ func (m *Model) SetFile(path string, info fs.FileInfo, isDir, available bool) {
 		m.kind = kindUnavailable
 	case isDir:
 		m.kind = kindDir
+	case ref.IsLocal():
+		data, truncated, err := readHead(ref)
+		m.applyContent(data, truncated, err)
 	default:
-		m.loadFile(path)
+		m.kind = kindLoading
+		return loadFileCmd(ref)
+	}
+	return nil
+}
+
+// HandleFileLoaded applies a completed read, ignoring one the cursor has
+// already moved past.
+func (m *Model) HandleFileLoaded(msg FileLoadedMsg) {
+	if msg.Path != m.path || m.kind != kindLoading {
+		return
+	}
+	m.applyContent(msg.Data, msg.Truncated, msg.Err)
+}
+
+func loadFileCmd(ref vfs.FileRef) tea.Cmd {
+	return func() tea.Msg {
+		data, truncated, err := readHead(ref)
+		return FileLoadedMsg{Path: ref.Path, Data: data, Truncated: truncated, Err: err}
 	}
 }
 
-func (m *Model) loadFile(path string) {
-	f, err := os.Open(path)
+// readHead reads the bounded head of a file, reporting whether more remained.
+func readHead(ref vfs.FileRef) ([]byte, bool, error) {
+	f, err := ref.FS.Open(ref.Path)
 	if err != nil {
-		m.kind = kindError
-		m.errMsg = err.Error()
-		return
+		return nil, false, err
 	}
 	defer f.Close()
 
 	// Read one byte past the cap so we can tell whether the file was truncated.
 	buf, err := io.ReadAll(io.LimitReader(f, maxPreviewBytes+1))
 	if err != nil {
+		return nil, false, err
+	}
+	if len(buf) > maxPreviewBytes {
+		return buf[:maxPreviewBytes], true, nil
+	}
+	return buf, false, nil
+}
+
+func (m *Model) applyContent(buf []byte, truncated bool, err error) {
+	m.truncated = truncated
+	if err != nil {
 		m.kind = kindError
 		m.errMsg = err.Error()
 		return
-	}
-	if len(buf) > maxPreviewBytes {
-		buf = buf[:maxPreviewBytes]
-		m.truncated = true
 	}
 	if len(buf) == 0 {
 		m.kind = kindEmpty
@@ -232,6 +269,8 @@ func (m Model) contentLines(width int, normal lipgloss.Style) []string {
 		return render(m.centered(width, "⟨ preview unavailable ⟩", m.name))
 	case kindError:
 		return render(m.centered(width, "⟨ cannot preview ⟩", m.errMsg))
+	case kindLoading:
+		return render(m.centered(width, "⟨ loading… ⟩", m.name))
 	default:
 		return nil
 	}

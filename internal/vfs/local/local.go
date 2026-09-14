@@ -65,5 +65,22 @@ func (f *FS) Rename(oldname, newname string) error {
 	return os.Rename(f.resolve(oldname), f.resolve(newname))
 }
 
+func (f *FS) Chmod(name string, mode fs.FileMode) error {
+	return os.Chmod(f.resolve(name), mode)
+}
+
+func (f *FS) Lstat(name string) (fs.FileInfo, error) {
+	return os.Lstat(f.resolve(name))
+}
+
+func (f *FS) ReadLink(name string) (string, error) {
+	return os.Readlink(f.resolve(name))
+}
+
 // Verify interface compliance at compile time.
-var _ vfs.WritableFS = (*FS)(nil)
+var (
+	_ vfs.WritableFS = (*FS)(nil)
+	_ vfs.Chmoder    = (*FS)(nil)
+	_ vfs.Lstater    = (*FS)(nil)
+	_ vfs.LinkReader = (*FS)(nil)
+)

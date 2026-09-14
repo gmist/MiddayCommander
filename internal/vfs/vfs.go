@@ -28,3 +28,21 @@ type WriteFile interface {
 	fs.File
 	io.Writer
 }
+
+// Backends differ: an archive is read-only, and SFTP sets a directory's mode
+// only after creating it. Optional capabilities are therefore separate
+// interfaces that callers type-assert and skip when absent.
+
+type Chmoder interface {
+	Chmod(name string, mode fs.FileMode) error
+}
+
+// Lstater stats a symlink without following it.
+type Lstater interface {
+	Lstat(name string) (fs.FileInfo, error)
+}
+
+// LinkReader reads a symlink's target.
+type LinkReader interface {
+	ReadLink(name string) (string, error)
+}
