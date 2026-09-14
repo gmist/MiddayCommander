@@ -8,6 +8,10 @@ import (
 // Bubble Tea reports a regular space as KeySpace, while other text uses
 // KeyRunes and may contain more than one rune when pasted or entered via IME.
 func PrintableInput(msg tea.KeyMsg) (string, bool) {
+	// Alt+key is a shortcut, not text.
+	if msg.Alt {
+		return "", false
+	}
 	if msg.Type != tea.KeyRunes && msg.Type != tea.KeySpace {
 		return "", false
 	}

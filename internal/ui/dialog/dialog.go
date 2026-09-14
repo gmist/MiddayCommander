@@ -52,6 +52,7 @@ type Model struct {
 	inputPos    int
 	basePath    string
 	suggestions []string
+	masked      bool // render the text as dots, for passphrases
 
 	// Progress dialog
 	totalFiles      int
@@ -62,6 +63,7 @@ type Model struct {
 	fileDoneBytes   int64
 	current         string
 	cancelRequested bool
+	connecting      bool // progress dialog with no measurable progress
 
 	// State
 	done     bool
@@ -100,6 +102,19 @@ func NewInputWithBase(title, message, defaultValue, tag, basePath string) Model 
 	}
 }
 
+// NewPassword hides the text on screen, for key passphrases. The value is
+// never stored: it goes straight to the connection attempt.
+func NewPassword(title, message, tag string) Model {
+	return Model{
+		kind:    KindInput,
+		title:   title,
+		message: message,
+		tag:     tag,
+		masked:  true,
+		width:   58,
+	}
+}
+
 // NewError creates an error display dialog.
 func NewError(title, message string) Model {
 	return Model{
@@ -118,6 +133,13 @@ func NewProgress(title, tag string) Model {
 		tag:   tag,
 		width: 64,
 	}
+}
+
+// SetConnecting drops the bars for a plain waiting notice: a connection has
+// no byte count to show.
+func (m *Model) SetConnecting(target string) {
+	m.connecting = true
+	m.current = target
 }
 
 // Done returns true when the dialog has been dismissed.
@@ -307,8 +329,12 @@ func (m Model) BoxSize(screenWidth, screenHeight int) (int, int) {
 	h := 2 + 1 + msgLines + 1 + 1 // borders + blank + content + blank + footer
 	switch m.kind {
 	case KindProgress:
-		// current file label + file bar + spacer + total label + total bar
-		h += 5
+		if m.connecting {
+			h++ // just the target line
+		} else {
+			// current file label + file bar + spacer + total label + total bar
+			h += 5
+		}
 	}
 	maxH := screenHeight * 3 / 4
 	if h > maxH {
@@ -350,35 +376,39 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 			maxInput = 1
 		}
 
-		// Determine visible window of the input around the cursor
+		// Determine visible window of the input around the cursor.
 		// Cutting happens on grapheme cluster boundaries only so emoji
-		// sequences (ZWJ, VS16, flags) are never split mid-emoji
+		// sequences (ZWJ, VS16, flags) are never split mid-emoji.
 		var clusters []string
+		cursorIdx := 0
 		for i := 0; i < len(m.input); {
 			c, _ := ansi.FirstGraphemeCluster(m.input[i:], ansi.GraphemeWidth)
+			if i < m.inputPos {
+				cursorIdx = len(clusters) + 1
+			}
 			clusters = append(clusters, c)
 			i += len(c)
+		}
+		// A passphrase shows one star per cluster, so the cursor stays on a
+		// cluster boundary and the window math below is unchanged.
+		shown, shownPos := m.input, m.inputPos
+		if m.masked {
+			for i := range clusters {
+				clusters[i] = "*"
+			}
+			shown = strings.Repeat("*", len(clusters))
+			shownPos = cursorIdx
 		}
 		widthOf := func(ss []string) int {
 			return ansi.StringWidth(strings.Join(ss, ""))
 		}
 		// Keep the cursor cell in mind - at the end of input it shows
 		// as a space next to the window so the window width shrinks by 1
-		if m.inputPos >= len(m.input) && maxInput > 1 {
+		if shownPos >= len(shown) && maxInput > 1 {
 			maxInput--
 		}
-		// Cursor cluster index: the cluster containing m.inputPos
-		cursorIdx := len(clusters)
-		for i, byteAt := 0, 0; i < len(clusters); i++ {
-			if byteAt == m.inputPos {
-				cursorIdx = i
-				break
-			}
-			byteAt += len(clusters[i])
-		}
 		visStart, visEnd := 0, len(clusters)
-		w := widthOf(clusters)
-		if w > maxInput {
+		if widthOf(clusters) > maxInput {
 			// Walk the left edge right while the cursor side overflows
 			for widthOf(clusters[visStart:]) > maxInput && visStart < cursorIdx {
 				visStart++
@@ -394,14 +424,14 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		visEndByte := len(strings.Join(clusters[:visEnd], ""))
 
 		cursorStyle := lipgloss.NewStyle().Background(highlight).Foreground(bg)
-		before := m.input[visStartByte:m.inputPos]
+		before := shown[visStartByte:shownPos]
 		after := ""
 		cursorCh := " "
-		if m.inputPos < len(m.input) {
+		if shownPos < len(shown) {
 			cursorCh = clusters[cursorIdx]
-			after = m.input[m.inputPos+len(cursorCh) : visEndByte]
-		} else if visEndByte < len(m.input) {
-			after = m.input[m.inputPos:visEndByte]
+			after = shown[shownPos+len(cursorCh) : visEndByte]
+		} else if visEndByte < len(shown) {
+			after = shown[shownPos:visEndByte]
 		}
 		line := dimStyle.Render(label) +
 			inputStyle.Render(before) +
@@ -439,6 +469,12 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		// already rendered above
 
 	case KindProgress:
+		if m.connecting {
+			line := bgStyle.Render(" " + overlay.PadOrTrunc(m.current, innerW-1))
+			contentLines = append(contentLines, line)
+			break
+		}
+
 		barWidth := innerW - 2
 		if barWidth < 1 {
 			barWidth = 1
@@ -468,8 +504,16 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		// Spacer
 		contentLines = append(contentLines, bgStyle.Render(strings.Repeat(" ", innerW)))
 
-		// Total summary line
-		totalLabel := fmt.Sprintf("Total: %d / %d files", m.doneFiles, m.totalFiles)
+		// A remote source has no pre-counted total, so show what is done.
+		var totalLabel string
+		if m.totalFiles > 0 {
+			totalLabel = fmt.Sprintf("Total: %d / %d files", m.doneFiles, m.totalFiles)
+		} else {
+			totalLabel = fmt.Sprintf("Total: %d files", m.doneFiles)
+			if m.doneBytes > 0 {
+				totalLabel += "   " + formatBytes(m.doneBytes)
+			}
+		}
 		if m.totalBytes > 0 {
 			totalLabel += fmt.Sprintf("   %s / %s",
 				formatBytes(m.doneBytes), formatBytes(m.totalBytes))
@@ -522,9 +566,8 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 			footer = keyStyle.Render(" Esc") + dimStyle.Render(":Cancel")
 		}
 	case KindError:
-		footer = keyStyle.Render(" Enter") + dimStyle.Render(":Close") +
-			dimStyle.Render("  ") +
-			keyStyle.Render("Esc") + dimStyle.Render(":Close")
+		// Enter and q also close; one hint is enough.
+		footer = keyStyle.Render(" Esc") + dimStyle.Render(":Close")
 	}
 	footerWidth := lipgloss.Width(footer)
 	if footerWidth < innerW {

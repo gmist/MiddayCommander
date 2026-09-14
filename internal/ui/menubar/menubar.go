@@ -14,9 +14,9 @@ import (
 
 // Item represents a single menu bar button.
 type Item struct {
-	Key      string // display label, e.g. "F5"
-	Label    string // action label, e.g. "Copy"
-	RawKey   string // actual key string for matching clicks, e.g. "f5"
+	Key    string // display label, e.g. "F5"
+	Label  string // action label, e.g. "Copy"
+	RawKey string // actual key string for matching clicks, e.g. "f5"
 }
 
 // DefaultItems returns the default menu bar items.
@@ -61,6 +61,7 @@ func ShiftItems(cfg config.Config) []Item {
 		{cfg.Keys.Quit, "Quit"},
 		{cfg.Keys.Rename, "Rename"},
 		{cfg.Keys.CopyPath, "CpPath"},
+		{cfg.Keys.Servers, "SSH"},
 		{cfg.Keys.GoTo, "GoTo"},
 		{cfg.Keys.TogglePanel, "Panel"},
 		{cfg.Keys.SwapPanels, "Swap"},

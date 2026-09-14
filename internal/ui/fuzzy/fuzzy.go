@@ -31,21 +31,21 @@ type FileWalkMsg struct {
 
 // Model is the fuzzy finder overlay.
 type Model struct {
-	query     string
-	allPaths  []string     // all discovered paths (accumulated)
-	matches   []match      // filtered + scored results
-	cursor    int          // selected result index
-	offset    int          // scroll offset
-	rootDir   string       // directory being searched
-	walking   bool         // true while background walker is running
-	width     int
-	height    int
+	query    string
+	allPaths []string // all discovered paths (accumulated)
+	matches  []match  // filtered + scored results
+	cursor   int      // selected result index
+	offset   int      // scroll offset
+	rootDir  string   // directory being searched
+	walking  bool     // true while background walker is running
+	width    int
+	height   int
 }
 
 type match struct {
-	path       string
-	score      int
-	matchIdxs  []int // character indices that matched in the display name
+	path      string
+	score     int
+	matchIdxs []int // character indices that matched in the display name
 }
 
 // New creates a new fuzzy finder searching from rootDir.

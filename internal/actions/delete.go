@@ -2,27 +2,27 @@ package actions
 
 import (
 	"context"
-	"os"
-	"path/filepath"
+
+	"github.com/kooler/MiddayCommander/internal/vfs"
 )
 
-// Delete removes all specified paths.
-func Delete(ctx context.Context, paths []string, progressFn func(Progress)) error {
+// Delete removes each ref and everything beneath it.
+func Delete(ctx context.Context, refs []vfs.FileRef, progressFn func(Progress)) error {
 	p := Progress{
 		Op:         OpDelete,
-		TotalFiles: len(paths),
+		TotalFiles: len(refs),
 	}
 
-	for _, path := range paths {
+	for _, ref := range refs {
 		if err := ctx.Err(); err != nil {
 			return ErrCancelled
 		}
-		p.Current = filepath.Base(path)
+		p.Current = ref.Base()
 		if progressFn != nil {
 			progressFn(p)
 		}
 
-		if err := os.RemoveAll(path); err != nil {
+		if err := removeRef(ref); err != nil {
 			return err
 		}
 

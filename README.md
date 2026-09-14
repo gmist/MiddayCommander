@@ -6,6 +6,8 @@ A modern dual-panel terminal file manager written in Go, inspired by Midnight Co
 
 Midday Commander (mdc) brings the classic dual-panel file management paradigm into the modern terminal with fuzzy finding, bookmarks, archive browsing, themes and customizable keybindings.
 
+Try online: <a href="https://build.demoshell.com/launch?snapshot=kooler%2Ftui%3Amdc"><img src="https://build.demoshell.com/v1/embed/badge.svg" alt="Live demo by DemoShell" align="absmiddle"></a>
+
 ![Midday Commander](images/sc_general.png)
 
 **Bookmarks** — bookmarks for most visited locations
@@ -21,6 +23,7 @@ Midday Commander (mdc) brings the classic dual-panel file management paradigm in
 
 - **Dual-panel file browsing** with independent navigation and selection
 - **Archive browsing** - enter ZIP, TAR, 7z, RAR, GZ, BZ2, XZ, LZ4 files as virtual directories
+- **SSH/SFTP panels** - open a remote server in either panel
 - **Fuzzy finder** - recursive file search with real-time fuzzy matching
 - **Bookmarks** to quickly jump to most visited locations
 - **Configurable keybindings** - every key is remappable via `config.toml`
@@ -129,6 +132,7 @@ Now `mdcd` launches mdc; when you quit, the shell `cd`s into the directory the a
 |-----|--------|
 | `F1` | Help - show keybinding reference |
 | `F2` | Bookmarks |
+| `Shift-F2` | SSH servers |
 | `F3` | View file (`$PAGER`) |
 | `F4` | Edit file (`$EDITOR`) |
 | `F5` | Copy to other panel |
@@ -188,6 +192,39 @@ entry and `-` `Enter` clears the selection.
 | `Enter` | Navigate to bookmark |
 | `Esc` | Close |
 
+### SSH servers
+
+Press `Shift-F2` to open the saved server list. Pick a server and it opens in the active panel where it behaves like any other directory: navigate it, copy or move files to the other panel with `F5` and `F6`. `Backspace` at the top level leaves the server and returns the panel to where it was.
+
+| Key | Action |
+|-----|--------|
+| `a` | Add a server |
+| `e` | Edit selected server |
+| `d` | Delete selected server |
+| `f` | Filter servers |
+| `0`-`9` | Quick jump to server |
+| `Enter` | Open in the active panel |
+| `Esc` | Close |
+
+You can also type an address straight into `Ctrl-G`:
+
+```
+ssh://user@host/var/log
+ssh://user@host:2222/srv/app
+```
+
+`Shift-F5` on a remote file copies its `ssh://` address, and bookmarking a remote directory stores that address, so the bookmark reconnects when you pick it.
+
+**`~/.ssh/config`.** Host aliases are used, so a name you already use at a shell prompt works here: `HostName`, `User`, `Port` and `IdentityFile` are read from the matching `Host` block. `ProxyJump` is not supported yet.
+
+**Authentication.** mdc uses your `ssh-agent` first, then the key file configured for the server (or `~/.ssh/id_ed25519`, `id_ecdsa`, `id_rsa`). Encrypted keys prompt for a passphrase, which is used for that connection and never written anywhere. Passwords are not supported.
+
+**Host keys** are checked against `~/.ssh/known_hosts`. A host you have not seen before shows its fingerprint for you to confirm; a host whose key has *changed* is refused. Resolve it by editing `known_hosts` once you have verified the new key.
+
+**What is unavailable on a remote panel.** The fuzzy finder (`F9`/`Ctrl-P`), running a file with `Enter`, and the command runner (`Ctrl-R`) all need a local working directory and do nothing on a server panel. `Ctrl-O` opens a shell in the panel's local directory instead. `F3` and `F4` work: the file is downloaded to a temporary copy, opened in `$PAGER`/`$EDITOR`, and written back if you changed it.
+
+**Progress.** Copying *from* a server shows the number of files completed rather than a percentage: counting a remote tree requires a full recursive scan before the first byte moves which can be very slow. Cancelling a transfer with `Esc` leaves nothing behind — files are written to a temp name and renamed into place only once complete.
+
 ### Quick view
 
 Press `Ctrl-Q` to turn the inactive pane into a live, read-only preview of the file selected in the active pane. As you move the cursor, the preview follows the selection. Press `Tab` to move focus into the preview and scroll it (`Up`/`Down`, `PgUp`/`PgDn`, `Home`/`End`), and `Tab` again to return to the listing. Press `Esc` (or `Ctrl-Q` again) to close it.
@@ -238,6 +275,7 @@ mkdir         = "f7"
 delete        = "f8"
 fuzzy_find    = ["f9", "ctrl+p"]
 bookmarks     = ["f2", "ctrl+b"]
+servers       = "shift+f2"
 help          = "f1"
 goto          = "ctrl+g"
 terminal      = "ctrl+o"
