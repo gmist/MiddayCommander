@@ -169,7 +169,8 @@ func TestChangedHostKeyShowsAnErrorNotAPrompt(t *testing.T) {
 	m, cmd := run(t, m, serverConnect(server))
 	m, _ = run(t, m, drain(t, cmd))
 	m, cmd = run(t, m, dialog.Result{Kind: dialog.KindConfirm, Confirmed: true, Tag: tagTrustHost})
-	m, _ = run(t, m, drain(t, cmd))
+	// Run for the known_hosts entry it writes; the model is finished with.
+	run(t, m, drain(t, cmd))
 
 	// The host now answers with a different key.
 	srv.RotateHostKey(t)

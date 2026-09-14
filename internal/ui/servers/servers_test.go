@@ -144,7 +144,7 @@ func TestNameDefaultsToHost(t *testing.T) {
 	m, _ = m.Update(key("a"))
 	m, _ = m.Update(key("tab"))
 	m = typeIn(m, "box.example.com")
-	m, _ = m.Update(key("enter"))
+	_, _ = m.Update(key("enter"))
 
 	if _, ok := store.Find("box.example.com"); !ok {
 		t.Error("want the host used as the name when none is given")
