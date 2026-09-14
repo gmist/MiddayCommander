@@ -6,9 +6,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/bookmark"
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
+	uitext "github.com/kooler/MiddayCommander/internal/ui/text"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
 
@@ -70,8 +72,8 @@ func (m Model) Update(msg tea.KeyMsg) (Model, tea.Cmd) {
 			}
 			m.filtering = false
 		case "backspace":
-			if len(m.filter) > 0 {
-				m.filter = m.filter[:len(m.filter)-1]
+			if start := uitext.PreviousGraphemeBoundary(m.filter, len(m.filter)); start >= 0 {
+				m.filter = m.filter[:start]
 				m.refilter()
 			} else {
 				m.filtering = false
@@ -87,8 +89,7 @@ func (m Model) Update(msg tea.KeyMsg) (Model, tea.Cmd) {
 				m.clampOffset()
 			}
 		default:
-			s := msg.String()
-			if len(s) == 1 && s[0] >= 32 {
+			if s, ok := uitext.PrintableInput(msg); ok {
 				m.filter += s
 				m.refilter()
 			}
@@ -153,13 +154,12 @@ func (m Model) updateAdding(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.adding = false
 		return m, nil
 	case "backspace":
-		if len(m.addName) > 0 {
-			m.addName = m.addName[:len(m.addName)-1]
+		if start := uitext.PreviousGraphemeBoundary(m.addName, len(m.addName)); start >= 0 {
+			m.addName = m.addName[:start]
 		}
 		return m, nil
 	default:
-		s := msg.String()
-		if len(s) == 1 && s[0] >= 32 {
+		if s, ok := uitext.PrintableInput(msg); ok {
 			m.addName += s
 		}
 		return m, nil
@@ -288,15 +288,15 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		if b.Name != "" {
 			display = b.Name + " → " + b.Path
 		}
-		if len(display) > innerW-4 {
-			display = "…" + display[len(display)-innerW+5:]
+		if ansi.StringWidth(display) > innerW-4 {
+			display = overlay.TruncateLeftEllipsis(display, innerW-4)
 		}
 
 		line := prefix + display
 		if isCursor {
-			contentLines = append(contentLines, cursorStyle.Render(padStr(line, innerW)))
+			contentLines = append(contentLines, cursorStyle.Render(overlay.PadOrTrunc(line, innerW)))
 		} else {
-			contentLines = append(contentLines, numStyle.Render(prefix)+bgStyle.Render(padStr(display, innerW-len(prefix))))
+			contentLines = append(contentLines, numStyle.Render(prefix)+bgStyle.Render(overlay.PadOrTrunc(display, innerW-len(prefix))))
 		}
 	}
 
@@ -331,11 +331,4 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 
 	return overlay.RenderBox("Bookmarks", contentLines, footer, boxW, boxH,
 		accent, bg, highlight)
-}
-
-func padStr(s string, width int) string {
-	if len(s) >= width {
-		return s[:width]
-	}
-	return s + strings.Repeat(" ", width-len(s))
 }

@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
@@ -197,13 +198,13 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 			rel = mt.path
 		}
 		display := rel
-		if len(display) > innerW-1 {
-			display = "…" + display[len(display)-innerW+2:]
+		if ansi.StringWidth(display) > innerW-1 {
+			display = overlay.TruncateLeftEllipsis(display, innerW-1)
 		}
 
 		var line string
 		if isCursor {
-			line = cursorStyle.Render(padStr(" "+display, innerW))
+			line = cursorStyle.Render(overlay.PadOrTrunc(" "+display, innerW))
 		} else {
 			line = renderWithHighlights(" "+display, shiftIdxs(mt.matchIdxs, 1), normalStyle, matchHLStyle, innerW)
 		}
@@ -388,11 +389,4 @@ func renderWithHighlights(s string, matchIdxs []int, normal, highlight lipgloss.
 		rendered += normal.Render(strings.Repeat(" ", width-visWidth))
 	}
 	return rendered
-}
-
-func padStr(s string, width int) string {
-	if len(s) >= width {
-		return s[:width]
-	}
-	return s + strings.Repeat(" ", width-len(s))
 }

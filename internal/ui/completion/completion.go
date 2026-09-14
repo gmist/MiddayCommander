@@ -49,16 +49,6 @@ func CommonPrefix(strs []string) string {
 	return prefix
 }
 
-func PadOrTrim(s string, width int) string {
-	if lipgloss.Width(s) > width {
-		if width > 3 {
-			return s[:width-3] + "..."
-		}
-		return s[:width]
-	}
-	return s + strings.Repeat(" ", width-lipgloss.Width(s))
-}
-
 func FormatSuggestions(suggestions []string, width, maxLines int, basename bool) []string {
 	if len(suggestions) == 0 {
 		return nil

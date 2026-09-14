@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/kooler/MiddayCommander/internal/config"
+	"github.com/kooler/MiddayCommander/internal/ui/overlay"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
 
@@ -161,18 +162,11 @@ func View(th theme.Theme, width int, items []Item) string {
 		if labelWidth < 0 {
 			labelWidth = 0
 		}
-		labelStr := th.StatusBar.Render(padOrTrunc(itm.Label, labelWidth))
+		labelStr := th.StatusBar.Render(overlay.PadOrTrunc(itm.Label, labelWidth))
 
 		b.WriteString(keyStr)
 		b.WriteString(labelStr)
 	}
 
 	return b.String()
-}
-
-func padOrTrunc(s string, width int) string {
-	if len(s) > width {
-		return s[:width]
-	}
-	return s + strings.Repeat(" ", width-len(s))
 }

@@ -14,7 +14,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kooler/MiddayCommander/internal/ui/overlay"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 	"github.com/kooler/MiddayCommander/internal/vfs"
 )
@@ -217,7 +219,7 @@ func (m Model) View(th theme.Theme, focused bool) string {
 	// Header: filename + preview tag.
 	header := m.name + " [preview]"
 	headerLine := borderStyle.Render("┌") +
-		headerStyle.Render(" "+truncOrPad(header, innerWidth-2)+" ") +
+		headerStyle.Render(" "+overlay.PadOrTruncDots(header, innerWidth-2)+" ") +
 		borderStyle.Render("┐")
 
 	// Body.
@@ -237,7 +239,7 @@ func (m Model) View(th theme.Theme, focused bool) string {
 
 	// Footer.
 	footerLine := borderStyle.Render("└") +
-		headerStyle.Render(truncOrPad(m.footerText(), innerWidth)) +
+		headerStyle.Render(overlay.PadOrTruncDots(m.footerText(), innerWidth)) +
 		borderStyle.Render("┘")
 
 	parts := []string{headerLine}
@@ -251,7 +253,7 @@ func (m Model) contentLines(width int, normal lipgloss.Style) []string {
 	render := func(ss []string) []string {
 		out := make([]string, len(ss))
 		for i, s := range ss {
-			out[i] = normal.Render(truncOrPad(s, width))
+			out[i] = normal.Render(overlay.PadOrTruncDots(s, width))
 		}
 		return out
 	}
@@ -284,7 +286,7 @@ func (m Model) centered(width int, msgs ...string) []string {
 		lines = append(lines, "")
 	}
 	for _, s := range msgs {
-		if pad := (width - len([]rune(s))) / 2; pad > 0 {
+		if pad := (width - ansi.StringWidth(s)) / 2; pad > 0 {
 			s = strings.Repeat(" ", pad) + s
 		}
 		lines = append(lines, s)
@@ -341,20 +343,6 @@ func splitLines(b []byte) []string {
 	s := strings.ReplaceAll(string(b), "\r\n", "\n")
 	s = strings.ReplaceAll(s, "\t", "    ")
 	return strings.Split(s, "\n")
-}
-
-func truncOrPad(s string, width int) string {
-	if width < 0 {
-		width = 0
-	}
-	r := []rune(s)
-	if len(r) > width {
-		if width > 3 {
-			return string(r[:width-3]) + "..."
-		}
-		return string(r[:width])
-	}
-	return s + strings.Repeat(" ", width-len(r))
 }
 
 func formatSize(n int64) string {

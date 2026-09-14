@@ -9,9 +9,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/ui/completion"
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
+	uitext "github.com/kooler/MiddayCommander/internal/ui/text"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
 
@@ -114,9 +116,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.updateSuggestions(), nil
 
 	case "backspace":
-		if m.inputPos > 0 {
-			m.input = m.input[:m.inputPos-1] + m.input[m.inputPos:]
-			m.inputPos--
+		start := uitext.PreviousGraphemeBoundary(m.input, m.inputPos)
+		if start >= 0 {
+			m.input = m.input[:start] + m.input[m.inputPos:]
+			m.inputPos = start
 		}
 		m.output = ""
 		m.outputLines = nil
@@ -124,8 +127,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m = m.updateSuggestions()
 
 	case "delete":
-		if m.inputPos < len(m.input) {
-			m.input = m.input[:m.inputPos] + m.input[m.inputPos+1:]
+		end := uitext.NextGraphemeBoundary(m.input, m.inputPos)
+		if end > m.inputPos {
+			m.input = m.input[:m.inputPos] + m.input[end:]
 		}
 		m.output = ""
 		m.outputLines = nil
@@ -133,13 +137,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m = m.updateSuggestions()
 
 	case "left":
-		if m.inputPos > 0 {
-			m.inputPos--
+		start := uitext.PreviousGraphemeBoundary(m.input, m.inputPos)
+		if start >= 0 {
+			m.inputPos = start
 		}
 
 	case "right":
-		if m.inputPos < len(m.input) {
-			m.inputPos++
+		end := uitext.NextGraphemeBoundary(m.input, m.inputPos)
+		if end > m.inputPos {
+			m.inputPos = end
 		}
 
 	case "home":
@@ -179,15 +185,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 
 	default:
-		s := msg.String()
-		if len(s) == 1 && s[0] >= 32 {
+		if s, ok := uitext.PrintableInput(msg); ok {
 			if m.inputPos < 0 {
 				m.inputPos = 0
 			} else if m.inputPos > len(m.input) {
 				m.inputPos = len(m.input)
 			}
 			m.input = m.input[:m.inputPos] + s + m.input[m.inputPos:]
-			m.inputPos++
+			m.inputPos += len(s)
 			m.output = ""
 			m.outputLines = nil
 			m.outputOffset = 0
@@ -238,8 +243,8 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 
 	// Directory line
 	dir := m.dir
-	if len(dir) > innerW-2 {
-		dir = "..." + dir[len(dir)-innerW+5:]
+	if ansi.StringWidth(dir) > innerW-2 {
+		dir = overlay.TruncateLeftEllipsis(dir, innerW-2)
 	}
 	dirLine := dimStyle.Render(" " + dir)
 	dirWidth := lipgloss.Width(dirLine)
@@ -251,7 +256,8 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 	// Input line with cursor
 	var inputDisplay string
 	if m.inputPos < len(m.input) {
-		inputDisplay = m.input[:m.inputPos] + "█" + m.input[m.inputPos:]
+		cluster, _ := ansi.FirstGraphemeCluster(m.input[m.inputPos:], ansi.GraphemeWidth)
+		inputDisplay = m.input[:m.inputPos] + "█" + m.input[m.inputPos+len(cluster):]
 	} else {
 		inputDisplay = m.input + "█"
 	}
@@ -286,8 +292,8 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		}
 		for i := m.outputOffset; i < end; i++ {
 			line := " " + m.outputLines[i]
-			if lipgloss.Width(line) > innerW {
-				line = line[:innerW]
+			if ansi.StringWidth(line) > innerW {
+				line = ansi.Truncate(line, innerW, "")
 			}
 			rendered := bgStyle.Render(line)
 			renderedWidth := lipgloss.Width(rendered)

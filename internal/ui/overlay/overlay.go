@@ -34,7 +34,8 @@ func Place(bg string, boxContent string, bgWidth, bgHeight, boxWidth, boxHeight 
 
 		bgLine := bgLines[bgIdx]
 
-		// ANSI-aware slicing: left portion of bg, then the fg box line, then right portion of bg
+		// Cell- and grapheme-aware slicing: keep the left and right portions of
+		// the background around the foreground box without breaking ANSI escapes
 		left := ansi.Truncate(bgLine, xOff, "")
 		right := ansi.Cut(bgLine, xOff+boxWidth, bgWidth)
 
@@ -100,4 +101,83 @@ func RenderBox(title string, contentLines []string, footer string, width, height
 	lines = append(lines, bottom)
 
 	return strings.Join(lines, "\n")
+}
+
+// TruncateLeftEllipsis keeps the right-most cells of s, prefixing with an
+// ellipsis if clipped. It never returns wider than width cells.
+func TruncateLeftEllipsis(s string, width int) string {
+	const ellipsis = "…"
+	if width < 1 {
+		return ""
+	}
+	w := ansi.StringWidth(s)
+	if w <= width {
+		return s
+	}
+	if width == 1 {
+		return ellipsis
+	}
+
+	needToStrip := w - (width - 1)
+	strippedWidth := 0
+	for i := 0; i < len(s); {
+		cluster, gw := ansi.FirstGraphemeCluster(s[i:], ansi.GraphemeWidth)
+		strippedWidth += gw
+		if strippedWidth >= needToStrip {
+			break
+		}
+		i += len(cluster)
+	}
+	tail := ansi.TruncateLeft(s, strippedWidth, "")
+	if ansi.StringWidth(tail) > width-1 {
+		tail = ""
+	}
+	return ellipsis + strings.Repeat(" ", width-1-ansi.StringWidth(tail)) + tail
+}
+
+// PadOrTrunc pads s with trailing spaces to exactly width cells, truncating
+// from the right when s is wider. The result is exactly width cells when
+// width >= 1 and empty otherwise
+func PadOrTrunc(s string, width int) string {
+	if width < 1 {
+		return ""
+	}
+	w := ansi.StringWidth(s)
+	if w > width {
+		out := ansi.Truncate(s, width, "")
+		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
+	}
+	return s + strings.Repeat(" ", width-w)
+}
+
+// PadOrTruncDots is PadOrTrunc, but clipped values end with "..." so the
+// cut stays visible. The result is exactly width cells when width >= 1
+func PadOrTruncDots(s string, width int) string {
+	if width < 1 {
+		return ""
+	}
+	w := ansi.StringWidth(s)
+	if w > width {
+		if width > 3 {
+			out := ansi.Truncate(s, width-3, "") + "..."
+			return out + strings.Repeat(" ", width-ansi.StringWidth(out))
+		}
+		out := ansi.Truncate(s, width, "")
+		return out + strings.Repeat(" ", width-ansi.StringWidth(out))
+	}
+	return s + strings.Repeat(" ", width-w)
+}
+
+// PadLeft right-aligns s in width cells, clipping on the left edge when s is
+// wider. The result is exactly width cells when width >= 1
+func PadLeft(s string, width int) string {
+	if width < 1 {
+		return ""
+	}
+	w := ansi.StringWidth(s)
+	if w >= width {
+		out := ansi.Truncate(s, width, "")
+		return strings.Repeat(" ", width-ansi.StringWidth(out)) + out
+	}
+	return strings.Repeat(" ", width-w) + s
 }

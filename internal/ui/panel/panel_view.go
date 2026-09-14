@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
+	"github.com/kooler/MiddayCommander/internal/ui/overlay"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
 
@@ -25,13 +27,16 @@ func (m Model) View(th theme.Theme) string {
 	}
 
 	innerWidth := m.width - 2 // account for left+right border chars
+	if innerWidth < 0 {
+		innerWidth = 0
+	}
 
 	header := m.Location().Display()
-	if len(header) > innerWidth-4 {
-		header = "..." + header[len(header)-innerWidth+7:]
+	if ansi.StringWidth(header) > innerWidth-4 {
+		header = overlay.TruncateLeftEllipsis(header, innerWidth-4)
 	}
 	headerLine := borderStyle.Render("┌") +
-		headerStyle.Render(" "+truncOrPad(header, innerWidth-2)+" ") +
+		headerStyle.Render(" "+overlay.PadOrTruncDots(header, innerWidth-2)+" ") +
 		borderStyle.Render("┐")
 
 	// File list rows. The vertical bar is styled once and reused: it is the
@@ -70,7 +75,7 @@ func (m Model) View(th theme.Theme) string {
 		}
 	}
 	footerLine := borderStyle.Render("└") +
-		headerStyle.Render(truncOrPad(footerText, innerWidth)) +
+		headerStyle.Render(overlay.PadOrTruncDots(footerText, innerWidth)) +
 		borderStyle.Render("┘")
 
 	// Assemble
@@ -109,14 +114,24 @@ func (m Model) renderRow(idx, width int, th theme.Theme) string {
 	sizeWidth := 7
 	nameWidth := width - sizeWidth - timeWidth - 2 // 2 spaces between columns
 	if nameWidth < 4 {
-		nameWidth = 4
+		timeWidth = 0
+		nameWidth = width - sizeWidth - 1
+		if nameWidth < 4 {
+			sizeWidth = 0
+			nameWidth = width
+		}
+	}
+	if nameWidth < 1 {
+		return ""
 	}
 
-	namePart := truncOrPad(name, nameWidth)
-	sizePart := padLeft(sizeStr, sizeWidth)
-	timePart := truncOrPad(timeStr, timeWidth)
-
-	line := namePart + " " + sizePart + " " + timePart
+	line := overlay.PadOrTruncDots(name, nameWidth)
+	if sizeWidth > 0 {
+		line += " " + overlay.PadLeft(sizeStr, sizeWidth)
+		if timeWidth > 0 {
+			line += " " + overlay.PadOrTruncDots(timeStr, timeWidth)
+		}
+	}
 
 	// Style based on state
 	var style lipgloss.Style
@@ -142,23 +157,6 @@ func (m Model) renderRow(idx, width int, th theme.Theme) string {
 	}
 
 	return style.Render(line)
-}
-
-func truncOrPad(s string, width int) string {
-	if len(s) > width {
-		if width > 3 {
-			return s[:width-3] + "..."
-		}
-		return s[:width]
-	}
-	return s + strings.Repeat(" ", width-len(s))
-}
-
-func padLeft(s string, width int) string {
-	if len(s) >= width {
-		return s[:width]
-	}
-	return strings.Repeat(" ", width-len(s)) + s
 }
 
 func isExecutable(mode fs.FileMode) bool {

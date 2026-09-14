@@ -7,11 +7,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/platform"
 	"github.com/kooler/MiddayCommander/internal/ui/completion"
 
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
+	uitext "github.com/kooler/MiddayCommander/internal/ui/text"
 	"github.com/kooler/MiddayCommander/internal/ui/theme"
 )
 
@@ -224,54 +226,45 @@ func (m *Model) updateInput(msg tea.KeyMsg) tea.Cmd {
 			})
 		}
 	case "backspace":
-		if m.inputPos > 0 {
-			m.input = m.input[:m.inputPos-1] + m.input[m.inputPos:]
-			m.inputPos--
+		start := uitext.PreviousGraphemeBoundary(m.input, m.inputPos)
+		if start >= 0 {
+			m.input = m.input[:start] + m.input[m.inputPos:]
+			m.inputPos = start
 		}
 		m.updateSuggestions()
 	case "delete":
-		if m.inputPos < len(m.input) {
-			m.input = m.input[:m.inputPos] + m.input[m.inputPos+1:]
+		end := uitext.NextGraphemeBoundary(m.input, m.inputPos)
+		if end > m.inputPos {
+			m.input = m.input[:m.inputPos] + m.input[end:]
 		}
 		m.updateSuggestions()
 	case "left":
-		if m.inputPos > 0 {
-			m.inputPos--
+		start := uitext.PreviousGraphemeBoundary(m.input, m.inputPos)
+		if start >= 0 {
+			m.inputPos = start
 		}
 	case "right":
-		if m.inputPos < len(m.input) {
-			m.inputPos++
+		end := uitext.NextGraphemeBoundary(m.input, m.inputPos)
+		if end > m.inputPos {
+			m.inputPos = end
 		}
 	case "home":
 		m.inputPos = 0
 	case "end":
 		m.inputPos = len(m.input)
 	default:
-		text := insertableText(msg)
-		if text == "" {
-			return nil
+		if s, ok := uitext.PrintableInput(msg); ok {
+			if m.inputPos < 0 {
+				m.inputPos = 0
+			} else if m.inputPos > len(m.input) {
+				m.inputPos = len(m.input)
+			}
+			m.input = m.input[:m.inputPos] + s + m.input[m.inputPos:]
+			m.inputPos += len(s)
+			m.updateSuggestions()
 		}
-		m.input = m.input[:m.inputPos] + text + m.input[m.inputPos:]
-		m.inputPos += len(text)
-		m.updateSuggestions()
 	}
 	return nil
-}
-
-// insertableText returns the characters a key carries, or "" if it is not
-// text. A paste arrives as one message of many runes, so the length is not
-// limited to one; a length test would drop pastes and non-ASCII characters.
-func insertableText(msg tea.KeyMsg) string {
-	if msg.Alt {
-		return ""
-	}
-	switch msg.Type {
-	case tea.KeyRunes:
-		return string(msg.Runes)
-	case tea.KeySpace:
-		return " "
-	}
-	return ""
 }
 
 func (m *Model) updateSuggestions() {
@@ -377,46 +370,72 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 	case KindInput:
 		// Message label and input with cursor at inputPos
 		label := " " + m.message + " "
-		labelW := len(label)
+		labelW := ansi.StringWidth(label)
 		maxInput := innerW - labelW
 		if maxInput < 1 {
 			maxInput = 1
 		}
 
-		// One single-byte star per byte keeps the cursor offsets below valid.
-		shown := m.input
-		if m.masked {
-			shown = strings.Repeat("*", len(m.input))
-		}
-
-		// Determine visible window of text around the cursor.
-		visStart := 0
-		visEnd := len(shown)
-		if visEnd-visStart > maxInput {
-			// Keep cursor visible with some context on both sides.
-			visStart = m.inputPos - maxInput/2
-			if visStart < 0 {
-				visStart = 0
+		// Determine visible window of the input around the cursor.
+		// Cutting happens on grapheme cluster boundaries only so emoji
+		// sequences (ZWJ, VS16, flags) are never split mid-emoji.
+		var clusters []string
+		cursorIdx := 0
+		for i := 0; i < len(m.input); {
+			c, _ := ansi.FirstGraphemeCluster(m.input[i:], ansi.GraphemeWidth)
+			if i < m.inputPos {
+				cursorIdx = len(clusters) + 1
 			}
-			visEnd = visStart + maxInput
-			if visEnd > len(shown) {
-				visEnd = len(shown)
-				visStart = visEnd - maxInput
-				if visStart < 0 {
-					visStart = 0
+			clusters = append(clusters, c)
+			i += len(c)
+		}
+		// A passphrase shows one star per cluster, so the cursor stays on a
+		// cluster boundary and the window math below is unchanged.
+		shown, shownPos := m.input, m.inputPos
+		if m.masked {
+			for i := range clusters {
+				clusters[i] = "*"
+			}
+			shown = strings.Repeat("*", len(clusters))
+			shownPos = cursorIdx
+		}
+		widthOf := func(ss []string) int {
+			return ansi.StringWidth(strings.Join(ss, ""))
+		}
+		// Keep the cursor cell in mind - at the end of input it shows
+		// as a space next to the window so the window width shrinks by 1
+		if shownPos >= len(shown) && maxInput > 1 {
+			maxInput--
+		}
+		visStart, visEnd := 0, len(clusters)
+		if widthOf(clusters) > maxInput {
+			// Walk the left edge right while the cursor side overflows
+			for widthOf(clusters[visStart:]) > maxInput && visStart < cursorIdx {
+				visStart++
+			}
+			// Extend the right edge while the window fits
+			for visEnd = visStart + 1; visEnd < len(clusters); visEnd++ {
+				if widthOf(clusters[visStart:visEnd+1]) > maxInput {
+					break
 				}
 			}
+			// The loop init can overshoot when visStart reached the end.
+			if visEnd > len(clusters) {
+				visEnd = len(clusters)
+			}
 		}
+		visStartByte := len(strings.Join(clusters[:visStart], ""))
+		visEndByte := len(strings.Join(clusters[:visEnd], ""))
 
 		cursorStyle := lipgloss.NewStyle().Background(highlight).Foreground(bg)
-		before := shown[visStart:m.inputPos]
+		before := shown[visStartByte:shownPos]
 		after := ""
 		cursorCh := " "
-		if m.inputPos < len(shown) {
-			cursorCh = string(shown[m.inputPos])
-			after = shown[m.inputPos+1 : visEnd]
-		} else if visEnd < len(shown) {
-			after = shown[m.inputPos:visEnd]
+		if shownPos < len(shown) {
+			cursorCh = clusters[cursorIdx]
+			after = shown[shownPos+len(cursorCh) : visEndByte]
+		} else if visEndByte < len(shown) {
+			after = shown[shownPos:visEndByte]
 		}
 		line := dimStyle.Render(label) +
 			inputStyle.Render(before) +
@@ -432,7 +451,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 			// Format suggestions compactly (multiple per line) like Ctrl+R
 			formatted := completion.FormatSuggestions(m.suggestions, innerW-2, 6, true)
 			for _, suggLine := range formatted {
-				sugLine := completion.PadOrTrim(suggLine, innerW-1)
+				sugLine := overlay.PadOrTruncDots(suggLine, innerW-1)
 				contentLines = append(contentLines, bgStyle.Render(" "+sugLine))
 			}
 		}
@@ -440,7 +459,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 	default:
 		// Message on its own line(s) for non-input dialogs
 		for _, msgLine := range wrapText(m.message, innerW-2) {
-			line := bgStyle.Render(" " + padRight(msgLine, innerW-1))
+			line := bgStyle.Render(" " + overlay.PadOrTrunc(msgLine, innerW-1))
 			contentLines = append(contentLines, line)
 		}
 	}
@@ -455,7 +474,7 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 
 	case KindProgress:
 		if m.connecting {
-			line := bgStyle.Render(" " + padRight(m.current, innerW-1))
+			line := bgStyle.Render(" " + overlay.PadOrTrunc(m.current, innerW-1))
 			contentLines = append(contentLines, line)
 			break
 		}
@@ -475,9 +494,9 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 			fileLabel += fmt.Sprintf("  (%s / %s)",
 				formatBytes(m.fileDoneBytes), formatBytes(m.fileTotalBytes))
 		}
-		fileLabel = truncateLeft(fileLabel, innerW-2)
+		fileLabel = overlay.TruncateLeftEllipsis(fileLabel, innerW-2)
 		contentLines = append(contentLines,
-			bgStyle.Render(" "+padRight(fileLabel, innerW-1)))
+			bgStyle.Render(" "+overlay.PadOrTrunc(fileLabel, innerW-1)))
 
 		// Per-file bar
 		var fileFrac float64
@@ -506,9 +525,9 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 		if m.cancelRequested {
 			totalLabel += "   [cancelling…]"
 		}
-		totalLabel = truncateLeft(totalLabel, innerW-2)
+		totalLabel = overlay.TruncateLeftEllipsis(totalLabel, innerW-2)
 		contentLines = append(contentLines,
-			bgStyle.Render(" "+padRight(totalLabel, innerW-1)))
+			bgStyle.Render(" "+overlay.PadOrTrunc(totalLabel, innerW-1)))
 
 		// Total bar
 		var totalFrac float64
@@ -592,41 +611,35 @@ func formatBytes(n int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGTPE"[exp])
 }
 
-// truncateLeft keeps the right-most characters, prefixing with … if clipped.
-// Useful for long file paths where the trailing name matters more.
-func truncateLeft(s string, width int) string {
-	if width < 1 {
-		return ""
-	}
-	if len(s) <= width {
-		return s
-	}
-	if width == 1 {
-		return "…"
-	}
-	return "…" + s[len(s)-width+1:]
-}
-
-func padRight(s string, width int) string {
-	if len(s) >= width {
-		return s[:width]
-	}
-	return s + strings.Repeat(" ", width-len(s))
-}
-
 func wrapText(text string, width int) []string {
-	if len(text) <= width {
+	if width < 1 {
+		width = 1
+	}
+	if ansi.StringWidth(text) <= width {
 		return []string{text}
 	}
 	var lines []string
-	for len(text) > width {
+	for ansi.StringWidth(text) > width {
 		// Find last space before width
-		cut := width
-		for cut > 0 && text[cut] != ' ' {
+		head := ansi.Truncate(text, width, "")
+		cut := len(head)
+		for cut > 0 && text[cut-1] != ' ' {
 			cut--
 		}
 		if cut == 0 {
-			cut = width
+			cut = len(head)
+			if cut == 0 {
+				n := 1
+				tail := ansi.TruncateLeft(text, n, "")
+				for len(tail) == len(text) && n < ansi.StringWidth(text) {
+					n++
+					tail = ansi.TruncateLeft(text, n, "")
+				}
+				cut = len(text) - len(tail)
+				if cut == 0 {
+					cut = 1
+				}
+			}
 		}
 		lines = append(lines, text[:cut])
 		text = strings.TrimLeft(text[cut:], " ")

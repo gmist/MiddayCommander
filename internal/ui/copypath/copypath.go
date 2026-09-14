@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/kooler/MiddayCommander/internal/platform"
 	"github.com/kooler/MiddayCommander/internal/ui/overlay"
@@ -103,9 +104,10 @@ func dismiss() tea.Msg { return DismissMsg{} }
 
 // BoxSize returns the desired box dimensions.
 func (m Model) BoxSize(screenWidth, screenHeight int) (int, int) {
-	maxLen := len(helpText)
+	maxLen := ansi.StringWidth(helpText)
 	for _, p := range m.paths {
-		if l := len(p) + 2; l > maxLen { // +2 for the cursor/selection prefix
+		l := ansi.StringWidth(p) + 2 // +2 for the cursor/selection prefix
+		if l > maxLen {
 			maxLen = l
 		}
 	}
@@ -145,7 +147,7 @@ func (m Model) View(_ theme.Theme, screenWidth, screenHeight int) string {
 	dimStyle := lipgloss.NewStyle().Background(bg).Foreground(subtle)
 
 	var contentLines []string
-	contentLines = append(contentLines, dimStyle.Render(padStr(" "+helpText, innerW)))
+	contentLines = append(contentLines, dimStyle.Render(overlay.PadOrTrunc(" "+helpText, innerW)))
 	contentLines = append(contentLines, bgStyle.Render(strings.Repeat(" ", innerW)))
 
 	for i, p := range m.paths {
@@ -154,10 +156,10 @@ func (m Model) View(_ theme.Theme, screenWidth, screenHeight int) string {
 			prefix = "> "
 		}
 		display := p
-		if len(display) > innerW-len(prefix) {
-			display = "…" + display[len(display)-(innerW-len(prefix))+1:]
+		if ansi.StringWidth(display) > innerW-len(prefix) {
+			display = overlay.TruncateLeftEllipsis(display, innerW-len(prefix))
 		}
-		line := padStr(prefix+display, innerW)
+		line := overlay.PadOrTrunc(prefix+display, innerW)
 		if i == m.cursor {
 			contentLines = append(contentLines, cursorStyle.Render(line))
 		} else {
@@ -178,11 +180,4 @@ func (m Model) View(_ theme.Theme, screenWidth, screenHeight int) string {
 
 	return overlay.RenderBox("Copy Path", contentLines, footer, boxW, boxH,
 		accent, bg, highlight)
-}
-
-func padStr(s string, width int) string {
-	if lipgloss.Width(s) >= width {
-		return s
-	}
-	return s + strings.Repeat(" ", width-lipgloss.Width(s))
 }
