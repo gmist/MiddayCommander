@@ -419,6 +419,10 @@ func (m Model) View(th theme.Theme, screenWidth, screenHeight int) string {
 					break
 				}
 			}
+			// The loop init can overshoot when visStart reached the end.
+			if visEnd > len(clusters) {
+				visEnd = len(clusters)
+			}
 		}
 		visStartByte := len(strings.Join(clusters[:visStart], ""))
 		visEndByte := len(strings.Join(clusters[:visEnd], ""))
