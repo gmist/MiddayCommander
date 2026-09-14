@@ -3,7 +3,6 @@ package panel
 import (
 	"fmt"
 	"io/fs"
-	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -27,16 +26,7 @@ func (m Model) View(th theme.Theme) string {
 
 	innerWidth := m.width - 2 // account for left+right border chars
 
-	// Header: current path (show archive name when inside one)
-	header := m.path
-	if m.inArchive {
-		archName := filepath.Base(m.archiveFS.ArchivePath())
-		if m.path == "." {
-			header = archName + "://"
-		} else {
-			header = archName + "://" + m.path
-		}
-	}
+	header := m.Location().Display()
 	if len(header) > innerWidth-4 {
 		header = "..." + header[len(header)-innerWidth+7:]
 	}
@@ -70,7 +60,7 @@ func (m Model) View(th theme.Theme) string {
 		footerText = fmt.Sprintf(" Search: %s_ ", m.searchQuery)
 	} else {
 		count := len(m.entries)
-		if m.entries != nil && !isRootPath(m.path) {
+		if m.entries != nil && !m.Location().IsRoot() {
 			count-- // exclude ".."
 		}
 		if m.showHidden {

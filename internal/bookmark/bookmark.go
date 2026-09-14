@@ -11,10 +11,10 @@ import (
 
 // Bookmark represents a saved directory bookmark.
 type Bookmark struct {
-	Path      string    `json:"path"`
-	Name      string    `json:"name,omitempty"` // optional display name
-	Count     int       `json:"count"`          // access count
-	LastUsed  time.Time `json:"last_used"`
+	Path     string    `json:"path"`
+	Name     string    `json:"name,omitempty"` // optional display name
+	Count    int       `json:"count"`          // access count
+	LastUsed time.Time `json:"last_used"`
 }
 
 // Store manages bookmarks with persistence and frecency scoring.

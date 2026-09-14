@@ -56,10 +56,10 @@ type sectionTOML struct {
 }
 
 type menuTOML struct {
-	FG         string `toml:"fg"`
-	BG         string `toml:"bg"`
-	FKeyHintFG string `toml:"fkey_hint_fg"`
-	FKeyHintBG string `toml:"fkey_hint_bg"`
+	FG          string `toml:"fg"`
+	BG          string `toml:"bg"`
+	FKeyHintFG  string `toml:"fkey_hint_fg"`
+	FKeyHintBG  string `toml:"fkey_hint_bg"`
 	FKeyLabelFG string `toml:"fkey_label_fg"`
 	FKeyLabelBG string `toml:"fkey_label_bg"`
 }
@@ -229,7 +229,7 @@ func buildTheme(tf ThemeFile) Theme {
 		FileExec:              orDefault(style(tf.Panel.File.ExecFG, tf.Panel.File.ExecBG), def.FileExec),
 		FileSymlink:           orDefault(style(tf.Panel.File.SymlinkFG, tf.Panel.File.SymlinkBG), def.FileSymlink),
 		FileCursor:            orDefault(style(tf.Panel.File.CursorFG, tf.Panel.File.CursorBG), def.FileCursor),
-		FileCursorDir: 		   orDefault(boldStyle(tf.Panel.File.CursorDirFG, tf.Panel.File.CursorDirBG, tf.Panel.File.CursorDirBold), def.FileCursorDir),
+		FileCursorDir:         orDefault(boldStyle(tf.Panel.File.CursorDirFG, tf.Panel.File.CursorDirBG, tf.Panel.File.CursorDirBold), def.FileCursorDir),
 		FileSelected:          orDefault(boldStyle(tf.Panel.File.SelectedFG, tf.Panel.File.SelectedBG, tf.Panel.File.SelectedBold), def.FileSelected),
 		FileCursorSelected:    orDefault(boldStyle(tf.Panel.File.SelectedFG, tf.Panel.File.CursorBG, tf.Panel.File.SelectedBold), def.FileCursorSelected),
 		FileCursorDirSelected: orDefault(boldStyle(tf.Panel.File.SelectedFG, tf.Panel.File.CursorDirBG, tf.Panel.File.CursorDirBold), def.FileCursorDirSelected),

@@ -1,8 +1,21 @@
 package actions
 
-import "os"
+import (
+	"io/fs"
 
-// Mkdir creates a directory at the given path.
-func Mkdir(path string) error {
-	return os.Mkdir(path, 0755)
+	"github.com/kooler/MiddayCommander/internal/vfs"
+)
+
+const dirPerm fs.FileMode = 0o755
+
+func Mkdir(ref vfs.FileRef) error {
+	w, err := writableAt(ref)
+	if err != nil {
+		return err
+	}
+	if err := w.Mkdir(ref.Path, dirPerm); err != nil {
+		return err
+	}
+	applyMode(w, ref, dirPerm)
+	return nil
 }

@@ -3,13 +3,13 @@ package actions
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
+
+	"github.com/kooler/MiddayCommander/internal/vfs"
 )
 
-// Move moves sources to destDir. Tries os.Rename first (fast, same device),
-// falls back to copy+delete for cross-device moves.
-func Move(ctx context.Context, sources []string, destDir string, progressFn func(Progress)) error {
+// Move moves sources into destDir, renaming when both sides share a
+// filesystem and falling back to copy-and-delete when they do not.
+func Move(ctx context.Context, sources []vfs.FileRef, destDir vfs.FileRef, progressFn func(Progress)) error {
 	// Precompute totals so the progress dialog has stable denominators even
 	// when some sources are renamed and others fall back to copy.
 	totalFiles, totalBytes := countFilesAndBytes(sources)
@@ -24,14 +24,19 @@ func Move(ctx context.Context, sources []string, destDir string, progressFn func
 			return ErrCancelled
 		}
 
-		destPath := filepath.Join(destDir, filepath.Base(src))
+		dst := destDir.Join(src.Base())
 
-		// Try rename first (instant if same filesystem).
-		if err := os.Rename(src, destPath); err == nil {
-			files, bytes := countFilesAndBytes([]string{destPath})
+		// Without this the rename fails on servers that implement it as a
+		// hard link, and the copy-and-delete fallback deletes the source.
+		if vfs.SamePath(src, dst) {
+			return fmt.Errorf("source and destination are the same: %s", src.Path)
+		}
+
+		if tryRename(src, dst) == nil {
+			files, bytes := countFilesAndBytes([]vfs.FileRef{dst})
 			agg.DoneFiles += files
 			agg.DoneBytes += bytes
-			agg.Current = filepath.Base(src)
+			agg.Current = src.Base()
 			agg.FileTotalBytes = 0
 			agg.FileDoneBytes = 0
 			if progressFn != nil {
@@ -40,9 +45,8 @@ func Move(ctx context.Context, sources []string, destDir string, progressFn func
 			continue
 		}
 
-		// Cross-device: copy then delete. Run the copy with a nested Progress
-		// but forward updates into the aggregate totals.
-		srcFiles, srcBytes := countFilesAndBytes([]string{src})
+		// Forward the copy's progress into the aggregate totals.
+		srcFiles, srcBytes := countFilesAndBytes([]vfs.FileRef{src})
 		startDoneFiles := agg.DoneFiles
 		startDoneBytes := agg.DoneBytes
 
@@ -57,11 +61,11 @@ func Move(ctx context.Context, sources []string, destDir string, progressFn func
 			}
 		}
 
-		if err := Copy(ctx, []string{src}, destDir, forward); err != nil {
-			return fmt.Errorf("move (copy phase) %s: %w", src, err)
+		if err := Copy(ctx, []vfs.FileRef{src}, destDir, forward); err != nil {
+			return fmt.Errorf("move (copy phase) %s: %w", src.Path, err)
 		}
-		if err := os.RemoveAll(src); err != nil {
-			return fmt.Errorf("move (delete phase) %s: %w", src, err)
+		if err := removeRef(src); err != nil {
+			return fmt.Errorf("move (delete phase) %s: %w", src.Path, err)
 		}
 		// Ensure aggregate reflects completion of this source even if Copy
 		// finished without a final progress tick at 100%.
@@ -74,37 +78,33 @@ func Move(ctx context.Context, sources []string, destDir string, progressFn func
 
 // MoveAs moves a single source to destPath (a full path, not a directory).
 // Used for single-item move where the user may have renamed the target.
-// Tries os.Rename first (fast, same device), falls back to copy+delete for
-// cross-device moves.
-func MoveAs(ctx context.Context, source, destPath string, progressFn func(Progress)) error {
+func MoveAs(ctx context.Context, source, destPath vfs.FileRef, progressFn func(Progress)) error {
 	if err := ctx.Err(); err != nil {
 		return ErrCancelled
 	}
 
-	if absEq(source, destPath) {
-		return fmt.Errorf("source and destination are the same: %s", source)
+	if vfs.SamePath(source, destPath) {
+		return fmt.Errorf("source and destination are the same: %s", source.Path)
 	}
 
-	totalFiles, totalBytes := countFilesAndBytes([]string{source})
+	totalFiles, totalBytes := countFilesAndBytes([]vfs.FileRef{source})
 	agg := Progress{
 		Op:         OpMove,
 		TotalFiles: totalFiles,
 		TotalBytes: totalBytes,
 	}
 
-	// Try rename first (instant if same filesystem).
-	if err := os.Rename(source, destPath); err == nil {
+	if tryRename(source, destPath) == nil {
 		agg.DoneFiles = totalFiles
 		agg.DoneBytes = totalBytes
-		agg.Current = filepath.Base(destPath)
+		agg.Current = destPath.Base()
 		if progressFn != nil {
 			progressFn(agg)
 		}
 		return nil
 	}
 
-	// Cross-device: copy then delete. Forward copy progress as a move op so
-	// the dialog keeps showing "Moving".
+	// Forward copy progress as a move so the dialog keeps showing "Moving".
 	forward := func(p Progress) {
 		agg.Current = p.Current
 		agg.FileTotalBytes = p.FileTotalBytes
@@ -116,17 +116,41 @@ func MoveAs(ctx context.Context, source, destPath string, progressFn func(Progre
 		}
 	}
 	if err := CopyAs(ctx, source, destPath, forward); err != nil {
-		return fmt.Errorf("move (copy phase) %s: %w", source, err)
+		return fmt.Errorf("move (copy phase) %s: %w", source.Path, err)
 	}
-	if err := os.RemoveAll(source); err != nil {
-		return fmt.Errorf("move (delete phase) %s: %w", source, err)
+	if err := removeRef(source); err != nil {
+		return fmt.Errorf("move (delete phase) %s: %w", source.Path, err)
 	}
 	return nil
 }
 
-// Rename renames a single file or directory.
-func Rename(oldPath, newName string) error {
-	dir := filepath.Dir(oldPath)
-	newPath := filepath.Join(dir, newName)
-	return os.Rename(oldPath, newPath)
+// tryRename fails when the two refs are not on one filesystem, which tells
+// the caller to fall back to copy-and-delete.
+func tryRename(src, dst vfs.FileRef) error {
+	if !vfs.SameFS(src, dst) {
+		return fmt.Errorf("different filesystems")
+	}
+	w, err := writableAt(dst)
+	if err != nil {
+		return err
+	}
+	return w.Rename(src.Path, dst.Path)
+}
+
+func removeRef(ref vfs.FileRef) error {
+	w, err := writableAt(ref)
+	if err != nil {
+		return err
+	}
+	return w.RemoveAll(ref.Path)
+}
+
+// Rename renames an entry within its own directory.
+func Rename(ref vfs.FileRef, newName string) error {
+	w, err := writableAt(ref)
+	if err != nil {
+		return err
+	}
+	target := ref.Parent().Join(newName)
+	return w.Rename(ref.Path, target.Path)
 }

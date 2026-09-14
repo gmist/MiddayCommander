@@ -30,8 +30,9 @@ type KeyMap struct {
 
 // Model represents a single file panel.
 type Model struct {
-	fs         vfs.FS
-	path       string        // absolute path of current directory
+	// stack is the chain of locations descended into, the last being on
+	// screen. An archive or server pushes; ".." at a root pops.
+	stack      []vfs.Location
 	entries    []fs.DirEntry // directory contents (sorted)
 	infos      []fs.FileInfo // cached FileInfo for each entry
 	cursor     int           // highlighted entry index
@@ -50,21 +51,13 @@ type Model struct {
 	searching   bool
 	searchQuery string
 
-	// Archive browsing state
-	inArchive   bool        // true when browsing inside an archive
-	archiveFS   *archive.FS // the archive VFS (nil when not in archive)
-	archivePath string      // path within the archive
-	realFS      vfs.FS      // the original filesystem (to restore when leaving archive)
-	realPath    string      // the directory containing the archive file
-
 	keyMap KeyMap
 }
 
 // New creates a new panel browsing the given directory.
 func New(filesystem vfs.FS, path string, km KeyMap, cfg config.Config) Model {
 	return Model{
-		fs:         filesystem,
-		path:       path,
+		stack:      []vfs.Location{vfs.NewLocation(filesystem, path, vfs.KindLocal, "")},
 		selected:   make(map[int]bool),
 		sortMode:   SortByName,
 		showHidden: cfg.Behavior.ShowHidden == nil || *cfg.Behavior.ShowHidden,
@@ -83,33 +76,88 @@ func (m Model) ShowHidden() bool {
 	return m.showHidden
 }
 
-// Path returns the current directory path.
-func (m Model) Path() string {
-	return m.path
+func (m Model) Location() vfs.Location {
+	return m.stack[len(m.stack)-1]
 }
 
-// SetPath changes the directory path (call LoadDir after).
-func (m *Model) SetPath(path string) {
-	// If currently in archive, leave it
-	if m.inArchive {
-		m.leaveArchive()
-	}
-	m.path = path
+func (m *Model) setLocation(loc vfs.Location) {
+	m.stack[len(m.stack)-1] = loc
+}
+
+func (m *Model) push(loc vfs.Location) {
+	m.stack = append(m.stack, loc)
 	m.cursor = 0
 	m.offset = 0
 }
 
-// InArchive returns whether this panel is browsing inside an archive.
-func (m Model) InArchive() bool {
-	return m.inArchive
-}
-
-// ArchiveLabel returns a display string for the archive being browsed, or "".
-func (m Model) ArchiveLabel() string {
-	if !m.inArchive {
+// pop leaves the innermost location and names the entry to put the cursor
+// back on. No-op at the outermost.
+func (m *Model) pop() string {
+	if len(m.stack) < 2 {
 		return ""
 	}
-	return m.archiveFS.ArchivePath()
+	inner := m.stack[len(m.stack)-1]
+	m.stack = m.stack[:len(m.stack)-1]
+	m.cursor = 0
+	m.offset = 0
+	return vfs.BasePath(m.Location().Kind, inner.Origin)
+}
+
+func (m Model) Path() string {
+	return m.Location().Path
+}
+
+func (m Model) Ref() vfs.FileRef {
+	return m.Location().Ref()
+}
+
+// UsesFS tells the app whether this panel still needs a shared connection.
+func (m Model) UsesFS(fsys vfs.FS) bool {
+	for _, loc := range m.stack {
+		if loc.FS == fsys {
+			return true
+		}
+	}
+	return false
+}
+
+// LocalPath is where the panel sits on this machine, even while showing a
+// server.
+func (m Model) LocalPath() string {
+	for i := len(m.stack) - 1; i >= 0; i-- {
+		if m.stack[i].IsLocal() {
+			return m.stack[i].Path
+		}
+	}
+	return m.stack[0].Path
+}
+
+func (m Model) IsLocal() bool {
+	return m.Location().IsLocal()
+}
+
+// SetPath leaves any archive or server first.
+func (m *Model) SetPath(path string) {
+	m.stack = m.stack[:1]
+	m.setLocation(m.stack[0].WithPath(path))
+	m.cursor = 0
+	m.offset = 0
+}
+
+// SetLocation descends from the outermost level, for opening a server.
+func (m *Model) SetLocation(loc vfs.Location) {
+	m.stack = m.stack[:1]
+	m.push(loc)
+}
+
+// InArchive returns whether this panel is browsing inside an archive.
+func (m Model) InArchive() bool {
+	return m.Location().Kind == vfs.KindArchive
+}
+
+// LocationLabel is the display string for a nested location, or "".
+func (m Model) LocationLabel() string {
+	return m.Location().Label
 }
 
 // SetSize sets the panel dimensions.
@@ -144,42 +192,45 @@ func (m Model) CurrentInfo() fs.FileInfo {
 	return nil
 }
 
-// CurrentPath returns the full path of the entry under the cursor.
-// For archive browsing this returns the path within the archive, not a real filesystem path.
+// CurrentPath is within the panel's own filesystem, not necessarily this
+// machine.
 func (m Model) CurrentPath() string {
 	e := m.CurrentEntry()
 	if e == nil {
-		return m.path
+		return m.Path()
 	}
-	if m.inArchive {
-		if m.path == "." {
-			return e.Name()
-		}
-		return m.path + "/" + e.Name()
-	}
-	return filepath.Join(m.path, e.Name())
+	return m.Location().Join(e.Name())
 }
 
-// SelectedPaths returns full paths of all tagged files. If none are tagged, returns the current entry.
-func (m Model) SelectedPaths() []string {
-	var paths []string
+func (m Model) CurrentRef() vfs.FileRef {
+	e := m.CurrentEntry()
+	if e == nil {
+		return m.Ref()
+	}
+	return m.Location().Child(e.Name())
+}
+
+// SelectedRefs returns the tagged entries, or the one under the cursor.
+func (m Model) SelectedRefs() []vfs.FileRef {
+	loc := m.Location()
+	var out []vfs.FileRef
 	for i, sel := range m.selected {
-		if sel && i < len(m.entries) {
-			paths = append(paths, filepath.Join(m.path, m.entries[i].Name()))
+		if sel && i < len(m.entries) && m.entries[i].Name() != ".." {
+			out = append(out, loc.Child(m.entries[i].Name()))
 		}
 	}
-	if len(paths) == 0 {
+	if len(out) == 0 {
 		if e := m.CurrentEntry(); e != nil && e.Name() != ".." {
-			paths = append(paths, m.CurrentPath())
+			out = append(out, m.CurrentRef())
 		}
 	}
-	return paths
+	return out
 }
 
 // LoadDir reads the current directory and populates entries.
 func (m *Model) LoadDir() tea.Cmd {
-	path := m.path
-	filesystem := m.fs
+	path := m.Path()
+	filesystem := m.Location().FS
 	return func() tea.Msg {
 		entries, err := readDir(filesystem, path)
 		return DirLoadedMsg{Path: path, Entries: entries, Err: err}
@@ -207,15 +258,16 @@ func (m *Model) HandleDirLoaded(msg DirLoadedMsg) {
 		m.err = msg.Err
 		return
 	}
-	if msg.Path != m.path {
+	if msg.Path != m.Path() {
 		return // stale load
 	}
 
 	m.err = nil
 
-	// Prepend ".." entry unless at root
+	// Prepend ".." unless there is nowhere to go: at the root of a nested
+	// location it leaves that location rather than the filesystem.
 	var all []fs.DirEntry
-	if !isRootPath(m.path) {
+	if !m.Location().IsRoot() || len(m.stack) > 1 {
 		all = append(all, parentEntry{})
 	}
 	for _, e := range msg.Entries {
@@ -394,8 +446,9 @@ func (m *Model) handleEnter() tea.Cmd {
 		return m.enterDir()
 	}
 
-	// Check if it's an archive we can browse into (only from real FS, not nested)
-	if !m.inArchive {
+	// Only a real file on this machine can be browsed as an archive; a
+	// remote one would have to be downloaded first.
+	if m.IsLocal() {
 		fullPath := m.CurrentPath()
 		if archive.IsArchive(fullPath) {
 			return m.enterArchive(fullPath)
@@ -413,7 +466,7 @@ func (m *Model) handleEnter() tea.Cmd {
 
 func (m *Model) handleSpace() tea.Cmd {
 	e := m.CurrentEntry()
-	if e == nil || e.IsDir() || m.inArchive {
+	if e == nil || e.IsDir() || !m.IsLocal() {
 		return nil
 	}
 	// Space on file = preview
@@ -428,26 +481,14 @@ func (m *Model) enterArchive(archivePath string) tea.Cmd {
 		return nil
 	}
 
-	m.realFS = m.fs
-	m.realPath = m.path
-	m.archiveFS = afs
-	m.inArchive = true
-	m.fs = afs
-	m.path = "."
-	m.archivePath = "."
-	m.cursor = 0
-	m.offset = 0
+	m.push(vfs.Location{
+		FS:     afs,
+		Path:   vfs.KindArchive.RootPath(),
+		Kind:   vfs.KindArchive,
+		Label:  filepath.Base(archivePath) + "://",
+		Origin: archivePath,
+	})
 	return m.LoadDir()
-}
-
-func (m *Model) leaveArchive() {
-	m.fs = m.realFS
-	m.path = m.realPath
-	m.inArchive = false
-	m.archiveFS = nil
-	m.archivePath = ""
-	m.realFS = nil
-	m.realPath = ""
 }
 
 func (m *Model) enterDir() tea.Cmd {
@@ -462,53 +503,29 @@ func (m *Model) enterDir() tea.Cmd {
 		return m.goUp()
 	}
 
-	if m.inArchive {
-		if m.path == "." {
-			m.path = e.Name()
-		} else {
-			m.path = m.path + "/" + e.Name()
-		}
-	} else {
-		m.path = filepath.Join(m.path, e.Name())
-	}
+	loc := m.Location()
+	m.setLocation(loc.WithPath(loc.Join(e.Name())))
 	m.cursor = 0
 	m.offset = 0
 	return m.LoadDir()
 }
 
 func (m *Model) goUp() tea.Cmd {
-	if m.inArchive {
-		// Going up within archive
-		if m.path == "." || m.path == "" {
-			// Leave the archive entirely
-			archiveName := filepath.Base(m.archiveFS.ArchivePath())
-			m.leaveArchive()
-			m.cursor = 0
-			m.offset = 0
-			return tea.Sequence(m.LoadDir(), func() tea.Msg {
-				return RestoreCursorMsg{Name: archiveName}
-			})
+	loc := m.Location()
+
+	// At the top of a nested location, ".." leaves it.
+	if loc.IsRoot() {
+		name := m.pop()
+		if name == "" {
+			return nil // already at the outermost root
 		}
-		// Go up one level within the archive
-		oldDir := filepath.Base(m.path)
-		parent := filepath.Dir(m.path)
-		if parent == "." || parent == "/" {
-			m.path = "."
-		} else {
-			m.path = parent
-		}
-		m.cursor = 0
-		m.offset = 0
 		return tea.Sequence(m.LoadDir(), func() tea.Msg {
-			return RestoreCursorMsg{Name: oldDir}
+			return RestoreCursorMsg{Name: name}
 		})
 	}
 
-	if isRootPath(m.path) {
-		return nil
-	}
-	oldDir := filepath.Base(m.path)
-	m.path = filepath.Dir(m.path)
+	oldDir := loc.Base()
+	m.setLocation(loc.WithPath(loc.Parent()))
 	m.cursor = 0
 	m.offset = 0
 
@@ -608,16 +625,6 @@ func (m *Model) InvertSelection() {
 func (m *Model) ChangeSortMode() {
 	m.sortMode = (m.sortMode + 1) % 4
 	SortEntries(m.entries, m.sortMode)
-}
-
-func isRootPath(path string) bool {
-	if path == string(filepath.Separator) {
-		return true
-	}
-	if len(path) == 3 && path[1] == ':' {
-		return true
-	}
-	return false
 }
 
 // parentEntry is a synthetic ".." directory entry.
