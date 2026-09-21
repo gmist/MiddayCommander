@@ -164,6 +164,11 @@ func (m Model) IsSymlinkToDir(e fs.DirEntry) bool {
 	return err == nil && info.IsDir()
 }
 
+// IsDirLike reports whether e behaves like a directory (real dir or symlink-to-dir).
+func IsDirLike(m *Model, e fs.DirEntry) bool {
+	return e.IsDir() || m.IsSymlinkToDir(e)
+}
+
 // LocationLabel is the display string for a nested location, or "".
 func (m Model) LocationLabel() string {
 	return m.Location().Label
@@ -286,7 +291,7 @@ func (m *Model) HandleDirLoaded(msg DirLoadedMsg) {
 		all = append(all, e)
 	}
 
-	SortEntries(all, m.sortMode)
+	SortEntries(all, m.sortMode, func(e fs.DirEntry) bool { return IsDirLike(m, e) })
 	m.entries = all
 
 	// Cache FileInfo
@@ -475,7 +480,7 @@ func (m *Model) handleEnter() tea.Cmd {
 
 func (m *Model) handleSpace() tea.Cmd {
 	e := m.CurrentEntry()
-	if e == nil || e.IsDir() || !m.IsLocal() {
+	if e == nil || IsDirLike(m, e) || !m.IsLocal() {
 		return nil
 	}
 	// Space on file = preview
@@ -633,7 +638,7 @@ func (m *Model) InvertSelection() {
 // ChangeSortMode cycles to the next sort mode and re-sorts.
 func (m *Model) ChangeSortMode() {
 	m.sortMode = (m.sortMode + 1) % 4
-	SortEntries(m.entries, m.sortMode)
+	SortEntries(m.entries, m.sortMode, func(e fs.DirEntry) bool { return IsDirLike(m, e) })
 }
 
 // parentEntry is a synthetic ".." directory entry.

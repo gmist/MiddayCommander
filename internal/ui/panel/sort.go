@@ -17,7 +17,10 @@ const (
 )
 
 // SortEntries sorts directory entries. Directories always come first.
-func SortEntries(entries []fs.DirEntry, mode SortMode) {
+// isDir classifies an entry as directory-like; callers should use it for both
+// real directories and symlinks that resolve to directories so those sort into
+// the same group.
+func SortEntries(entries []fs.DirEntry, mode SortMode, isDir func(fs.DirEntry) bool) {
 	sort.SliceStable(entries, func(i, j int) bool {
 		a, b := entries[i], entries[j]
 
@@ -30,8 +33,8 @@ func SortEntries(entries []fs.DirEntry, mode SortMode) {
 		}
 
 		// Directories before files
-		aDir := a.IsDir()
-		bDir := b.IsDir()
+		aDir := isDir(a)
+		bDir := isDir(b)
 		if aDir != bDir {
 			return aDir
 		}
