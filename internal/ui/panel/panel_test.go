@@ -254,3 +254,43 @@ func (e *nameOnlyEntry) IsDir() bool               { return e.isDir }
 func (e *nameOnlyEntry) Type() fs.FileMode         { return 0 }
 func (e *nameOnlyEntry) Info() (fs.FileInfo, error) { return nil, nil }
 func (e *nameOnlyEntry) String() string            { return e.name }
+
+// symlinkToDirEntry is a minimal fs.DirEntry that behaves like a directory but
+// reports IsDir=false (same as os.ReadDir on a symlink-to-dir).
+type symlinkToDirEntry struct {
+	nameOnlyEntry
+}
+
+func (e *symlinkToDirEntry) Type() fs.FileMode { return fs.ModeSymlink }
+
+func TestSortEntriesSymlinkGroupsWithDirs(t *testing.T) {
+	entries := []fs.DirEntry{
+		&nameOnlyEntry{name: "b.txt", isDir: false},
+		&nameOnlyEntry{name: "a.txt", isDir: false},
+		&symlinkToDirEntry{nameOnlyEntry{name: "d-link"}},
+		&nameOnlyEntry{name: "c.txt", isDir: false},
+		&nameOnlyEntry{name: "real-dir", isDir: true},
+		&nameOnlyEntry{name: "a-dir", isDir: true},
+	}
+	SortEntries(entries, SortByName, func(e fs.DirEntry) bool {
+		if e.Type()&fs.ModeSymlink != 0 {
+			return true // simulated symlink-to-dir: group with dirs
+		}
+		return e.IsDir()
+	})
+
+	if got := entries[0].Name(); got != "a-dir" {
+		t.Errorf("first = %q, want dir", got)
+	}
+	if got := entries[1].Name(); got != "d-link" {
+		t.Errorf("second = %q, want symlink-to-dir grouped with dirs", got)
+	}
+	if got := entries[2].Name(); got != "real-dir" {
+		t.Errorf("third = %q, want dir", got)
+	}
+	for i, name := range []string{"a-dir", "d-link", "real-dir"} {
+		if entries[i].Name() != name {
+			t.Errorf("entries[%d] = %q, want %q", i, entries[i].Name(), name)
+		}
+	}
+}

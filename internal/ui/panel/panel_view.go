@@ -91,7 +91,7 @@ func (m Model) renderRow(idx, width int, th theme.Theme) string {
 	info := m.infos[idx]
 
 	name := entry.Name()
-	isDir := entry.IsDir()
+	isDir := IsDirLike(&m, entry)
 	isCursor := idx == m.cursor && m.active
 	isSelected := m.selected[idx]
 
