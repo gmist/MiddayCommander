@@ -50,13 +50,23 @@ func New(dir string, width, height int) Model {
 	}
 }
 
+// SetSize updates the screen size the box is laid out against, so a resized
+// terminal does not leave the output scrolled past its visible window.
+func (m *Model) SetSize(w, h int) {
+	m.width = w
+	m.height = h
+	maxOffset := len(m.outputLines) - m.outputHeight()
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.outputOffset > maxOffset {
+		m.outputOffset = maxOffset
+	}
+}
+
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-
 	case CommandDoneMsg:
 		m.running = false
 		if msg.Err != nil {

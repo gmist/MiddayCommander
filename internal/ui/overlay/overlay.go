@@ -135,6 +135,25 @@ func TruncateLeftEllipsis(s string, width int) string {
 	return ellipsis + strings.Repeat(" ", width-1-ansi.StringWidth(tail)) + tail
 }
 
+// ClampScroll returns the offset that keeps cursor inside the visible window
+// of the given height. Every scrollable list shares this, so the window a list
+// scrolls in and the window it draws in cannot drift apart.
+func ClampScroll(cursor, offset, height int) int {
+	if height < 1 {
+		height = 1
+	}
+	if cursor < offset {
+		offset = cursor
+	}
+	if cursor >= offset+height {
+		offset = cursor - height + 1
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return offset
+}
+
 // PadOrTrunc pads s with trailing spaces to exactly width cells, truncating
 // from the right when s is wider. The result is exactly width cells when
 // width >= 1 and empty otherwise
