@@ -158,6 +158,11 @@ func (m Model) updateFilter(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.refilter()
 	case "enter":
 		m.mode = modeList
+		if len(m.items) == 0 {
+			m.filter = ""
+			m.refilter()
+			return m, nil
+		}
 		return m.connectAt(m.cursor)
 	case "backspace":
 		if len(m.filter) > 0 {

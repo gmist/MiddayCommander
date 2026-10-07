@@ -79,6 +79,8 @@ func (m Model) Update(msg tea.KeyMsg) (Model, tea.Cmd) {
 				return m, func() tea.Msg { return SelectMsg{Path: path} }
 			}
 			m.filtering = false
+			m.filter = ""
+			m.refilter()
 		case "backspace":
 			if start := uitext.PreviousGraphemeBoundary(m.filter, len(m.filter)); start >= 0 {
 				m.filter = m.filter[:start]
