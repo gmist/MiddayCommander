@@ -194,23 +194,14 @@ func (m *Model) Update(msg tea.KeyMsg) {
 }
 
 func (m *Model) clampOffset() {
-	if max := m.maxOffset(); m.offset > max {
-		m.offset = max
-	}
-	if m.offset < 0 {
-		m.offset = 0
-	}
+	m.offset = max(0, min(m.offset, m.maxOffset()))
 }
 
 func (m Model) maxOffset() int {
 	if m.kind != kindText {
 		return 0
 	}
-	max := len(m.lines) - m.height
-	if max < 0 {
-		max = 0
-	}
-	return max
+	return max(0, len(m.lines)-m.height)
 }
 
 // View renders the preview as a bordered box, matching the panel layout.

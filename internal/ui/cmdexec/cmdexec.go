@@ -55,13 +55,7 @@ func New(dir string, width, height int) Model {
 func (m *Model) SetSize(w, h int) {
 	m.width = w
 	m.height = h
-	maxOffset := len(m.outputLines) - m.outputHeight()
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-	if m.outputOffset > maxOffset {
-		m.outputOffset = maxOffset
-	}
+	m.clampOffset()
 }
 
 // Update handles messages.
@@ -165,34 +159,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.inputPos = len(m.input)
 
 	case "up":
-		if m.outputOffset > 0 {
-			m.outputOffset--
-		}
+		m.outputOffset--
+		m.clampOffset()
 
 	case "down":
-		maxOffset := len(m.outputLines) - m.outputHeight()
-		if maxOffset < 0 {
-			maxOffset = 0
-		}
-		if m.outputOffset < maxOffset {
-			m.outputOffset++
-		}
+		m.outputOffset++
+		m.clampOffset()
 
 	case "pgup":
 		m.outputOffset -= m.outputHeight()
-		if m.outputOffset < 0 {
-			m.outputOffset = 0
-		}
+		m.clampOffset()
 
 	case "pgdown":
 		m.outputOffset += m.outputHeight()
-		maxOffset := len(m.outputLines) - m.outputHeight()
-		if maxOffset < 0 {
-			maxOffset = 0
-		}
-		if m.outputOffset > maxOffset {
-			m.outputOffset = maxOffset
-		}
+		m.clampOffset()
 
 	default:
 		if s, ok := uitext.PrintableInput(msg); ok {
@@ -233,6 +213,14 @@ func (m Model) outputHeight() int {
 		h = 1
 	}
 	return h
+}
+
+func (m *Model) clampOffset() {
+	m.outputOffset = max(0, min(m.outputOffset, m.maxOffset()))
+}
+
+func (m Model) maxOffset() int {
+	return max(0, len(m.outputLines)-m.outputHeight())
 }
 
 // View renders the command execution overlay.
