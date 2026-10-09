@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/kooler/MiddayCommander/internal/config"
+	"github.com/kooler/MiddayCommander/internal/ui/overlay"
 	"github.com/kooler/MiddayCommander/internal/vfs"
 	"github.com/kooler/MiddayCommander/internal/vfs/archive"
 )
@@ -456,15 +457,7 @@ func (m *Model) moveDown(n int) {
 }
 
 func (m *Model) clampOffset() {
-	if m.height <= 0 {
-		return
-	}
-	if m.cursor < m.offset {
-		m.offset = m.cursor
-	}
-	if m.cursor >= m.offset+m.height {
-		m.offset = m.cursor - m.height + 1
-	}
+	m.offset = overlay.ClampScroll(m.cursor, m.offset, m.height, len(m.entries))
 }
 
 func (m *Model) handleEnter() tea.Cmd {
