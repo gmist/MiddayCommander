@@ -136,17 +136,32 @@ func TruncateLeftEllipsis(s string, width int) string {
 }
 
 // ClampScroll returns the offset that keeps cursor inside the visible window
-// of the given height. Every scrollable list shares this, so the window a list
+// of the given height and caps it to max(0, count-height) so growing the
+// window cannot leave blank rows at the bottom while top rows stay hidden.
+// Every scrollable list shares this, so the window a list
 // scrolls in and the window it draws in cannot drift apart.
-func ClampScroll(cursor, offset, height int) int {
+func ClampScroll(cursor, offset, height, count int) int {
 	if height < 1 {
 		height = 1
+	}
+	if count < 0 {
+		count = 0
+	}
+	maxOffset := count - height
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if offset > maxOffset {
+		offset = maxOffset
 	}
 	if cursor < offset {
 		offset = cursor
 	}
 	if cursor >= offset+height {
 		offset = cursor - height + 1
+	}
+	if offset > maxOffset {
+		offset = maxOffset
 	}
 	if offset < 0 {
 		offset = 0

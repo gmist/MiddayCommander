@@ -168,7 +168,7 @@ func (m Model) resultHeight() int {
 }
 
 func (m *Model) clampOffset() {
-	m.offset = overlay.ClampScroll(m.cursor, m.offset, m.resultHeight())
+	m.offset = overlay.ClampScroll(m.cursor, m.offset, m.resultHeight(), len(m.entries))
 }
 
 // View renders the theme picker as a floating box.
