@@ -188,6 +188,7 @@ func (m Model) LocationLabel() string {
 func (m *Model) SetSize(w, h int) {
 	m.width = w
 	m.height = h
+	m.clampOffset()
 }
 
 // SetActive marks this panel as focused/unfocused.
