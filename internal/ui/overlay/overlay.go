@@ -147,10 +147,7 @@ func ClampScroll(cursor, offset, height, count int) int {
 	if count < 0 {
 		count = 0
 	}
-	maxOffset := count - height
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
+	maxOffset := max(0, count-height)
 	if offset > maxOffset {
 		offset = maxOffset
 	}
