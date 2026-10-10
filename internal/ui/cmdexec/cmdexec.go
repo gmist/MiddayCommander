@@ -216,11 +216,7 @@ func (m Model) outputHeight() int {
 }
 
 func (m *Model) clampOffset() {
-	m.outputOffset = max(0, min(m.outputOffset, m.maxOffset()))
-}
-
-func (m Model) maxOffset() int {
-	return max(0, len(m.outputLines)-m.outputHeight())
+	m.outputOffset = max(0, min(m.outputOffset, max(0, len(m.outputLines)-m.outputHeight())))
 }
 
 // View renders the command execution overlay.
